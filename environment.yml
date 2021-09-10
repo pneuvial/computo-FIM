@@ -5,5 +5,9 @@ dependencies:
   - jupyter
   - matplotlib
   - numpy
-  - scikit-learn
+  - r-base=4.1.1
+  - r-knitr
+  - r-plotly
+  - r-tidyverse
+  - r-reticulate
  
