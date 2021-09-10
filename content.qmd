@@ -140,17 +140,15 @@ author "Jane Doe"
 ---
 ```
 
-You can use Jupyter for Python code and more. And R + KnitR for if you want to mix R with Python (via the package reticulate @reticulate).
+You can use Jupyter for Python code and more. And R + KnitR for if you want to mix R with Python (via the package reticulate @R-reticulate).
 
 ### R
 
 `R` code [@R-base] chunks may be embedded as follows:
 
-```{.r r-code, echo=TRUE}
+```{r r-code, echo=TRUE}
 x <- rnorm(10)
 ```
-
-In this case, the the yaml 
 
 
 ### Python
@@ -273,5 +271,5 @@ page](https://quarto.org/docs/authoring/cross-references.html).
 
 # Bibliography {.unnumbered}
 
-```{#bibliography}
+```{bibliography}
 ```
