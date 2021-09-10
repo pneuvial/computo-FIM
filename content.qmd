@@ -2,7 +2,6 @@
 title: "Template for contribution to Computo"
 subtitle: "Example based on the quarto system"
 author: "The Computo team"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
 bibliography: references.bib
 ---
 
