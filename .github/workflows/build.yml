@@ -1,0 +1,42 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  computorticle:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checking out repository for Github action
+        uses: actions/checkout@v2
+
+      - name: Installing dependencies with Miniconda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          auto-activate-base: false
+          miniconda-version: 'latest'
+          python-version: 3.9
+          environment-file: environment.yml
+          activate-environment: computo
+
+      - name: Installing quarto
+        uses: quarto-dev/quarto-actions/install-quarto@v1
+
+      - name: Rendering with Quarto
+        shell: bash -l {0}
+        run: |
+            mkdir _build
+            quarto render content.qmd
+            mv content.html _build/index.html
+
+      - name: Deploying article on github pages
+        uses: JamesIves/github-pages-deploy-action@3.7.1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages
+          FOLDER: _build
+          CLEAN: true
