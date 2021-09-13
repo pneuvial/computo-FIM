@@ -271,5 +271,6 @@ page](https://quarto.org/docs/authoring/cross-references.html).
 
 # Bibliography {.unnumbered}
 
-```{bibliography}
-```
+::: {#refs}
+:::
+

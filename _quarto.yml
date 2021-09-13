@@ -3,8 +3,9 @@ number-sections: true
 format:
   html:
     include-in-header:
-      - includes/pseudocode-header.html
-    include-after-body: includes/pseudocode-footer.html
+        - includes/pseudocode-header.html
+    include-after-body:
+        - includes/pseudocode-footer.html
     toc: true
     theme: cosmo
     highlight-style: github
@@ -21,4 +22,3 @@ crossref:
   eq-prefix: Equation
   fig-prefix: Figure   
   tbl-prefix: Table
-
