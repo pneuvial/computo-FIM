@@ -1,5 +1,5 @@
 *.swp
 _build
-*.html
+content.html
 
 /.quarto/
