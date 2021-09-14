@@ -1,11 +1,10 @@
 name: build
-
 on:
   schedule:
-    # launch the build weekly to check that everything works find
     - cron:  '0 0 * * 0' 
   push:
     branches:
+      - master
       - main
 
 jobs:
@@ -32,7 +31,6 @@ jobs:
       - name: Rendering with Quarto
         shell: bash -l {0}
         run: |
-            export LANG=en_US.UTF-8
             mkdir _build
             quarto render content.qmd
             mv content.html _build/index.html
