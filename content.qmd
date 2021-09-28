@@ -31,7 +31,7 @@ template, quarto, R, Python, reproductibility
 
 ## About this document
 
-This document provides a template based on the [quarto system](https://quarto.org/) for contributions to **Computo** @computo. We show how `Python` @perez2011python or  `R`` code can be included. 
+This document provides a template based on the [quarto system](https://quarto.org/) for contributions to **Computo** @computo. We show how `Python` [@perez2011python] or  `R` [@R-base] code can be included.
 
 ## Advice for writting your manuscript
 
@@ -39,7 +39,7 @@ First make sure that you are able to build your manuscript as a regular notebook
 
 # Formatting
 
-This section covers basic formatting guidelines. [Quarto](https://quarto.org/) is a versatile  formatting system for authoring HTML based on markdown, integrating $\LaTeX$ and various code block interpreted either via Jupyter or Knitr (and thus deal with Python, R and many other langages). It relies on the [Pandoc Markdown](https://rmarkdown.rstudio.com/authoring_pandoc_markdown.html) markup language. 
+This section covers basic formatting guidelines. [Quarto](https://quarto.org/) is a versatile  formatting system for authoring HTML based on markdown, integrating $\LaTeX$ and various code block interpreted either via Jupyter or Knitr (and thus deal with Python, R and many other langages). It relies on the [Pandoc Markdown](https://rmarkdown.rstudio.com/authoring_pandoc_markdown.html) markup language.
 
 To render/compile a document, run `quarto render`. A document will be generated that includes both content as well as the output of any embedded code chunks within the document:
 
@@ -65,40 +65,25 @@ But we can also do a numbered list
 
 ### Mathematical formulae
 
-[LaTeX](https://www.latex-project.org/) code is natively supported [^We use [katex](https://katex.org/) for this purpose.], which makes it possible to use mathematical formulae:
+[LaTeX](https://www.latex-project.org/) code is natively supported[^katex], which makes it possible to use mathematical formulae:
+
+[^katex]: We use [katex](https://katex.org/) for this purpose.
 
 will render
 
 $$
-f(x_1, \dots, x_n; \mu, \sigma^2) = 
+f(x_1, \dots, x_n; \mu, \sigma^2) =
 \frac{1}{\sigma \sqrt{2\pi}} \exp{\left(- \frac{1}{2\sigma^2}\sum_{i=1}^n(x_i - \mu)^2\right)}
 $$
 
-It is also posible to cross-reference an equation:
-
-```
-Equation `@eq-mylabel` is a more advanced example:
-$$
-\begin{aligned}
-D_{x_N} & = \frac12 
-\left[\begin{array}{cc}
-x_L^\top & x_N^\top \end{array}\right] \, 
-\left[\begin{array}{cc}  L_L & B \\ B^\top & L_N \end{array}\right] \, 
-\left[\begin{array}{c}
-x_L \\ x_N \end{array}\right] \\
-& = \frac12 (x_L^\top L_L x_L + 2 x_N^\top B^\top x_L + x_N^\top L_N x_N),
-\end{aligned}
-$$ {#eq-mylabel}
-```
-
-Equation `@eq-mylabel` is a more advanced example:
+It is also posible to cross-reference an equation, see @eq-mylabel:
 
 $$
 \begin{aligned}
-D_{x_N} & = \frac12 
+D_{x_N} & = \frac12
 \left[\begin{array}{cc}
-x_L^\top & x_N^\top \end{array}\right] \, 
-\left[\begin{array}{cc}  L_L & B \\ B^\top & L_N \end{array}\right] \, 
+x_L^\top & x_N^\top \end{array}\right] \,
+\left[\begin{array}{cc}  L_L & B \\ B^\top & L_N \end{array}\right] \,
 \left[\begin{array}{c}
 x_L \\ x_N \end{array}\right] \\
 & = \frac12 (x_L^\top L_L x_L + 2 x_N^\top B^\top x_L + x_N^\top L_N x_N),
@@ -121,7 +106,7 @@ See @thm-slln.
 
 ## Code
 
-Quarto uses either Jupyter or Knitr to render code chunks. This can be triggered in the yaml header, e.g., for Jupyter (should be installed on your computer) use
+Quarto uses either Jupyter or knitr to render code chunks. This can be triggered in the yaml header, e.g., for Jupyter (should be installed on your computer) use
 
 ``` yaml
 ---
@@ -256,14 +241,14 @@ the `.bib` file specified in the header of this document (here:
 ### Other cross-references
 
 As already (partially) seen, Quarto includes a mecanism similar to the
-bibliographic references for section, equations, theorem, figure,
-listing, etc. HAve a look at [this
+bibliographic references for sections, equations, theorems, figures,
+lists, etc. Have a look at [this
 page](https://quarto.org/docs/authoring/cross-references.html).
 
 
 ::: {.callout-warning}
 
-## For more information and details
+## For more information
 
 [Check our mock version of the t-SNE paper](https://computo.sfds.asso.fr/published-paper-tsne/) for a full and advanced example.
 
@@ -273,4 +258,3 @@ page](https://quarto.org/docs/authoring/cross-references.html).
 
 ::: {#refs}
 :::
-
