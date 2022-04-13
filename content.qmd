@@ -1,31 +1,26 @@
 ---
 title: "Template for contribution to Computo"
 subtitle: "Example based on the quarto system"
-author: "The Computo team"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+author:
+  - name: "The Computo team"
+    url: https://computorg.github.io/
+    affiliation: Société Française de Statistique
+    affiliation-url: https://www.sfds.asso.fr/
+date: last-modified
+abstract: >+
+  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur posuere vestibulum facilisis. Aenean pretium orci augue, quis lobortis libero accumsan eu. Nam mollis lorem sit amet pellentesque ullamcorper. Curabitur lobortis libero eget malesuada vestibulum. Nam nec nibh massa. Pellentesque porttitor cursus tellus. Mauris urna erat, rhoncus sed faucibus sit amet, venenatis eu ipsum.
+citation:
+  type: article-journal
+  container-title: "Computo"
+  doi: "xxxx"
+  url: https://computo.sfds.asso.fr/template-computo-quarto
+github: https://github.com/computorg/template-computo-quarto
 bibliography: references.bib
+repo: "template-computo-quarto"
 ---
 
-::: {.callout-note icon=false}
-
-## Abstract
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur posuere
-vestibulum facilisis. Aenean pretium orci augue, quis lobortis libero accumsan
-eu. Nam mollis lorem sit amet pellentesque ullamcorper. Curabitur lobortis
-libero eget malesuada vestibulum. Nam nec nibh massa. Pellentesque porttitor
-cursus tellus. Mauris urna erat, rhoncus sed faucibus sit amet, venenatis eu
-ipsum.
-
-:::
-
-::: {.callout-note icon=false}
-
-## Keywords
-
-template, quarto, R, Python, reproductibility
-
-:::
+[![build status](https://github.com/computorg/{{< meta repo >}}/workflows/build/badge.svg)](https://github.com/computorg/{{< meta repo >}})
+[![Creative Commons License](https://i.creativecommons.org/l/by/4.0/80x15.png)](http://creativecommons.org/licenses/by/4.0/)
 
 # Introduction
 
@@ -245,7 +240,6 @@ bibliographic references for sections, equations, theorems, figures,
 lists, etc. Have a look at [this
 page](https://quarto.org/docs/authoring/cross-references.html).
 
-
 ::: {.callout-warning}
 
 ## For more information
@@ -254,7 +248,9 @@ page](https://quarto.org/docs/authoring/cross-references.html).
 
 :::
 
-# Bibliography {.unnumbered}
+# Session information {.appendix .unnumbered}
 
-::: {#refs}
-:::
+```{r session-info}
+sessionInfo()
+```
+
