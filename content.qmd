@@ -141,7 +141,7 @@ jupyter: python3
 ---
 ```
 
-```{python}
+```{python, eval = FALSE}
 import matplotlib.pyplot as plt
 import numpy as np
 
