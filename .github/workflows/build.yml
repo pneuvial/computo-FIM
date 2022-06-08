@@ -7,6 +7,10 @@ on:
       - master
       - main
 
+env: # Change this if needed
+  quarto_file: content
+  GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   computorticle:
     runs-on: ubuntu-latest
@@ -29,15 +33,16 @@ jobs:
         uses: quarto-dev/quarto-actions/install-quarto@v1
 
       - name: Rendering with Quarto
+        shell: bash -l {0}
         run: |
-            quarto render
+            quarto render ${{ env.quarto_file }}.qmd
             mkdir _build
-            mv content.html _build/index.html
+            mv ${{ env.quarto_file }}.html _build/index.html
+            cp environment.yml _build/
 
       - name: Deploying article on github pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          ## GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: gh-pages
           FOLDER: _build
           CLEAN: true

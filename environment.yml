@@ -7,7 +7,6 @@ dependencies:
   - matplotlib
   - numpy
   - r-base
-  - r-rmarkdown
   - r-knitr
   - r-plotly
   - r-tidyverse
