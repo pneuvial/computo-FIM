@@ -141,6 +141,10 @@ jupyter: python3
 ---
 ```
 
+```{r echo = FALSE, results='hide'}
+reticulate::virtualenv_create("r-reticulate", Sys.which("python"))
+```
+
 ```{python}
 import matplotlib.pyplot as plt
 import numpy as np
