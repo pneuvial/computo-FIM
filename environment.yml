@@ -10,5 +10,5 @@ dependencies:
   - r-knitr
   - r-plotly
   - r-tidyverse
-  - r-reticulate=1.22
+  - r-reticulate
  
