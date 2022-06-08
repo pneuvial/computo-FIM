@@ -6,7 +6,7 @@ dependencies:
   - jupyter
   - matplotlib
   - numpy
-  - r-base=4.2.0
+  - r-base
   - r-knitr
   - r-plotly
   - r-tidyverse
