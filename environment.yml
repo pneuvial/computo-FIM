@@ -11,4 +11,10 @@ dependencies:
   - r-plotly
   - r-tidyverse
   - r-reticulate
+  - r-flextable
+  - r-magrittr
+  - r-ggplot2
+  - r-cowplot
+  - r-RColorBrewer
+  - r-devtools
  
