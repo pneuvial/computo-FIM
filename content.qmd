@@ -1,14 +1,13 @@
 ---
-title: "Template for contribution to Computo"
-subtitle: "Example based on the quarto system"
+title: "Computing  an empirical  Fisher information matrix estimate in latent variable models through stochastic approximation"
 author:
-  - name: "The Computo team"
-    url: https://computorg.github.io/
-    affiliation: Société Française de Statistique
-    affiliation-url: https://www.sfds.asso.fr/
+  - name: "Maud Delattre"
+    affiliation: Université Paris-Saclay, INRAE, MaIAGE, 78350, Jouy-en-Josas, France
+  - name: "Estelle Kuhn"
+    affiliation: Université Paris-Saclay, INRAE, MaIAGE, 78350, Jouy-en-Josas, France
 date: last-modified
 abstract: >+
-  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur posuere vestibulum facilisis. Aenean pretium orci augue, quis lobortis libero accumsan eu. Nam mollis lorem sit amet pellentesque ullamcorper. Curabitur lobortis libero eget malesuada vestibulum. Nam nec nibh massa. Pellentesque porttitor cursus tellus. Mauris urna erat, rhoncus sed faucibus sit amet, venenatis eu ipsum.
+  The Fisher information matrix (FIM) is a key quantity in statistics. However its exact computation is often not trivial. In particular in many latent variable models, it is intricated due to the presence of unobserved variables. Several methods have been proposed to approximate the  FIM when it can not be evaluated analytically.  Different  estimates have been considered, in particular moment estimates. However some of them require to compute second derivatives of the complete data log-likelihood which leads to some disadvantages. In this paper, we focus on the empirical Fisher information matrix defined as an empirical estimate of the covariance matrix of the score, which only requires to compute the first derivatives of the log-likelihood. Our contribution consists in presenting a new numerical method to evaluate this empirical Fisher information matrix in latent variable model when the proposed estimate can not be directly analytically evaluated. We propose a stochastic approximation estimation algorithm to compute this estimate as a by-product of the parameter estimate. We evaluate the finite sample size properties of the proposed estimate and the convergence properties of the estimation algorithm through simulation studies. 
 citation:
   type: article-journal
   container-title: "Computo"
@@ -22,235 +21,2166 @@ repo: "template-computo-quarto"
 [![build status](https://github.com/computorg/{{< meta repo >}}/workflows/build/badge.svg)](https://github.com/computorg/{{< meta repo >}})
 [![Creative Commons License](https://i.creativecommons.org/l/by/4.0/80x15.png)](http://creativecommons.org/licenses/by/4.0/)
 
+
+
+
+```{r}
+#| label: loadlibrary
+#| echo: false
+#| message: false
+library(dplyr)
+library(flextable)
+library(magrittr)
+library(ggplot2)
+library(cowplot)
+library(RColorBrewer)
+library(devtools)
+```
+
+
 # Introduction
 
-## About this document
+The Fisher information matrix (FIM) is a key quantity in statistics as it is required for examples  for evaluating asymptotic precisions of parameter estimates, for building  optimality criteria in experimental designs, for computing Wald test statistics  or classical asymptotic distributions in statistical testing [@VanderVaart2000]. It also appears more recently in post model selection inference [@charkhi2018asymptotic], in asymptotic distribution of the likelihood ratio test statistics when testing variance component in mixed models [@baey2019asymptotic] or  as a particular Riemannian metric on complex manifold [@le2021fisher]. However its exact computation is often not trivial. This is in particular the case in many latent variables models,  also called incomplete data models, due to the presence of the unobserved variables. Though these models are increasingly used in many fields of application, such as in ecophysiology [@Technow2015], in genomic [@Picard2007] or in ecology [@Gloaguen2014]. They especially allow a better consideration of the different variability sources and when appropriate, a more precise characterization of the known mechanisms at the origin of the data. When the FIM can not be exactly computed, people either approximate it numerically, for example by using Monte Carlo technics like developed in the R package MIXFIM [@mixfim2018] or focus on an estimate of the FIM. The probably most widely used  is the observed FIM [@efron1978assessing].  When  it can not be directly computed in latent variable models, several methods have  been proposed to approximate it. Among the most frequently used approaches are Monte-Carlo methods or iterative algorithms derived from the missing information principle [@Woodbury1972]. Indeed according to this principle, the observed Fisher information matrix can be expressed as the difference between two matrices corresponding to the complete information and the missing information due to the unobserved variables (see *e.g.* [@McLachlan2008] chapter 4). It enables the development of alternative methods to compute the observed FIM: the Louis's method [@Louis1982], combined with a Monte Carlo method or a stochastic approximation algorithm by [@Delyon1999], the Oakes method [@Oakes1999] or the supplemented Expectation Maximization algorithm [@Meng1991].  However as the observed FIM involves the second derivatives of the observed log-likelihood, all these methods require to compute second derivatives of the complete data log-likelihood which leads to some disadvantages from a computational point of view. More recently, [@Meng2017] proposed an accelerated algorithm based on numerical first order derivatives of the conditional expectation of the log-likelihood. Another estimate is the empirical Fisher information matrix. This estimator of the FIM is defined as the moment estimate of the covariance matrix of the score. It is  much less used  than the observed Fisher information matrix. However it has a nice property since it is positive definite, which is not systematically the case for the latter and  it is numerically more interesting because it  only requires the calculation of the first derivatives of the log-likelihood.
 
-This document provides a template based on the [quarto system](https://quarto.org/) for contributions to **Computo** @computo. We show how `Python` [@perez2011python] or  `R` [@R-base] code can be included.
 
-## Advice for writting your manuscript
+In this paper, our contribution consists in presenting a new numerical method to evaluate the empirical FIM in latent variables model. 
+Indeed, when the proposed estimate can not be directly analytically evaluated, we propose a stochastic approximation estimation algorithm to compute  it, which  provides this estimate of the FIM as a by-product of model parameter estimates. 
 
-First make sure that you are able to build your manuscript as a regular notebook on your system. Then you can start configure the binder environment.
 
-# Formatting
+The paper is organized as follows. In Section 2, we recall the three main FIM estimates  and discuss their immediate properties. In Section 3, we give practical tools for the computation of the empirical  Fisher information matrix in incomplete data models. In particular, we introduce a new stochastic approximation procedure based on the first derivatives of the complete log-likelihood only and state its asymptotic properties. In Section 4, we illustrate the finite sample size properties of both estimators and the convergence properties of the computation algorithm through simulations. The paper ends by a discussion.
 
-This section covers basic formatting guidelines. [Quarto](https://quarto.org/) is a versatile  formatting system for authoring HTML based on markdown, integrating $\LaTeX$ and various code block interpreted either via Jupyter or Knitr (and thus deal with Python, R and many other langages). It relies on the [Pandoc Markdown](https://rmarkdown.rstudio.com/authoring_pandoc_markdown.html) markup language.
+# Moment estimates of the Fisher information matrix
 
-To render/compile a document, run `quarto render`. A document will be generated that includes both content as well as the output of any embedded code chunks within the document:
-
-``` .bash
-quarto render content.qmd # will render to html
-```
-
-## Basic markdown formatting
-
-**Bold text** or _italic_
-
-- This is a list
-- With more elements
-- It isn't numbered.
-
-But we can also do a numbered list
-
-1. This is my first item
-2. This is my second item
-3. This is my third item
-
-## Mathematics
-
-### Mathematical formulae
-
-[LaTeX](https://www.latex-project.org/) code is natively supported[^katex], which makes it possible to use mathematical formulae:
-
-[^katex]: We use [katex](https://katex.org/) for this purpose.
-
-will render
-
+Let us consider a random variable $Y$.  Assume $Y$ admits a density $g$ with respect to a given measure depending on some parameter $\theta$ taking values in an open subset $\Theta$ of $\mathbb{R}^{d}$, such that the log-likelihood function $\log g$ is differentiable on $\Theta$ and that $\|\partial_\theta  \log g(y;\theta) (\partial_\theta  \log g(y;\theta))^t\|$ is integrable, where $x^t$ stands for the transpose of a vector or a matrix $x$. Then, by definition, the Fisher information matrix is given for all $\theta\in\Theta$ by:
 $$
-f(x_1, \dots, x_n; \mu, \sigma^2) =
-\frac{1}{\sigma \sqrt{2\pi}} \exp{\left(- \frac{1}{2\sigma^2}\sum_{i=1}^n(x_i - \mu)^2\right)}
+I(\theta) =  E_\theta\left[\partial_\theta \log g(Y;\theta) (\partial_\theta \log g(Y;\theta))^t \right].
+$$ {#eq-fisher_der1}
+When this expression can not be analytically evaluated, people are interested in computing an estimate of the Fisher information matrix.
+Considering this expression, one can derive a first moment estimator of the Fisher information matrix based on a $n$-sample $(y_1, \ldots, y_{n})$ of observations:
+$$
+I_{n,sco}(\theta) = \frac{1}{n} \sum_{i=1}^n \partial_\theta \log g(y_i;\theta) (\partial_\theta \log g(y_i;\theta))^t.
+$$
+This estimate is indeed equal to the mean of the Gram matrices of the scores. One can also derive a second estimate from @eq-fisher_der1 defined as
+$$
+I_{n,cov}(\theta) = \frac{1}{n} \sum_{i=1}^n \partial_\theta \log g(y_i;\theta) (\partial_\theta \log g(y_i;\theta))^t-\bar{s}\bar{s}^t,
+$$
+where $\bar{s}=\frac{1}{n}\sum_{i=1}^n \partial_\theta \log g(y_i;\theta)$ (see *e.g.* [@Scott2002]).	We emphasize here that the terminology "empirical Fisher information matrix" is used  in the literature for both estimates (see *e.g.* [@kunstner2019limitations]).
+
+If the log-likelihood function $\log g$ is twice differentiable on $\Theta$, the following relation also holds for all $\theta \in \Theta$:
+$$
+I(\theta) =  - E_\theta\left[\partial_\theta^2 \log g(Y;\theta) \right].
+$$ {#eq-fisher_der2}
+
+Considering this second expression, we can derive another moment estimator of  the Fisher information matrix based on a $n$-sample $(y_1, \ldots, y_{n})$ of observations, called the observed Fisher information matrix defined as:
+$$
+I_{n,obs}(\theta) = - \frac{1}{n} \sum_{i=1}^n \partial_\theta^2 \log g(y_i;\theta).
 $$
 
-It is also posible to cross-reference an equation, see @eq-mylabel:
+::: {.remark}
+We emphasize that the estimate $I_{n,sco}(\theta)$ is always positive definite, since it is a mean of Gram matrices, contrary to the others estimates $I_{n,obs}(\theta)$ and $I_{n,cov}(\theta)$.
+:::
+
+::: {.remark}
+The asymptotical properties of the estimates $I_{n,sco}(\theta)$ and $I_{n,obs}(\theta)$ are straighforward when considering independent and identically distributed sample $(y_1, \ldots, y_{n})$. In particular, assuming standard regularity conditions on $g$, it follows directly from the  central limit theorem that $I_{n,sco}(\theta)$ and $I_{n,obs}(\theta)$ are asymptotically normal. 
+:::
+
+::: {.remark}
+Since both estimators  $I_{n,sco}(\theta)$ and $I_{n,obs}(\theta)$ are moment estimates of $I(\theta)$, they are unbiased for all $\theta \in \Theta$. This is not the case for $I_{n,cov}(\theta)$. Regarding the variance, none of both estimators is better than the other one. This can be highlighted through the following examples. First consider a Gaussian sample with unknown expectation and fixed variance. Then, the variance of the estimator $I_{n,obs}(\theta)$ is zero whereas the variance of the estimator $I_{n,sco}(\theta)$ is positive. Second consider a centered Gaussian sample with unknown variance. Then, the variance of $I_{n,sco}(\theta)$ is smaller than the variance of $I_{n,obs}(\theta)$. Therefore, none of both estimators is more suitable than the other in general from this point of view. 
+:::
+
+If the variables $Y_1, \ldots, Y_{n}$ are not identically distributed, for example if they depend on some individual covariates which is often the case, we state the following result under the less restrictive assumption of  independent non identically distributed random variables.
+
+::: {#prp-prop1}
+Assume that $Y_1, \ldots, Y_{n}$ are independent non identically distributed random variables each having a parametric probability density function $g_i$ depending on some common parameter $\theta$ in  an open subset $\Theta$ of $\mathbb{R}^p$. Assume also that for all $i$ the function $\log g_i$ is differentiable in $\theta$ on $\Theta$ and that for all $\theta \in \Theta$, $\partial_\theta \log g_i(y;\theta) (\partial_\theta \log g_i(y;\theta))^t$ is integrable. Moreover assume that for all $\theta$   in $\Theta$, $\lim \frac1{n} \displaystyle\sum_{i=1}^n E_\theta(\partial_\theta \log g_i(y;\theta) (\partial_\theta \log g_i(y;\theta))^t)$ exists and denote it by $\nu(\theta)$.
+Then, for all $\theta \in \Theta$, the  estimator $I_{n,sco}(\theta)$ is defined, converges almost surely toward $\nu(\theta)$  and is asymptotically normal. 
+Assuming additionaly that $\log g_i$ is twice differentiable in $\theta$ on $\Theta$, the   estimator $I_{n,obs}(\theta)$ is defined, converges almost surely toward $\nu(\theta)$  and is  asymptotically normal.
+:::
+
+
+::: {.proof}
+We prove the consistency by applying the law of large numbers for non identically distributed variables. We establish the normality result by using characteristic functions. By recentering the terms $E_\theta(\partial_\theta \log g_i(y;\theta) (\partial_\theta \log g_i(y;\theta))^t)$, we can assume that $\nu(\theta)$ equals zero. Let us denote by $\phi_Z$ the characteristic function for a random variable $Z$. We have for all real $t$ in a neighborhood of zero that:
+$$
+\begin{split}
+\| \phi_{I_{n,sco}(\theta)/ \sqrt{n}}(t)-1 \| & = \|  \prod_{i=1}^n (\phi_{\partial_\theta \log g_i(y;\theta) (\partial_\theta \log g_i(y;\theta))^t}(t/n)-1) \| \\
+& \leq   \prod_{i=1}^n \|  \phi_{\partial_\theta \log g_i(y;\theta) (\partial_\theta \log g_i(y;\theta))^t}(t/n)-1 \| 
+\end{split}
+$$
+Computing a limited expansion in $t$ around zero, we get the result.
+
+Noting that for all $1 \leq  i \leq n$, $E_\theta(\partial_\theta \log g_i(y;\theta) (\partial_\theta \log g_i(y;\theta))^t)=-E_\theta(\partial_\theta^2 \log g_i(y;\theta))$, we get the corresponding results for the estimator $I_{n,obs}(\theta)$.
+:::
+
+::: {.remark}
+The additional assumptions required when considering non identically distributed random variables are in the same spirit as  those usually used in the literature. Let us quote for example [@Nie2006], [@Silvapulle2011], [@baey2019asymptotic].
+:::
+
+# Computing the  estimator $I_{n,sco}(\theta)$ in latent variable model
+
+Let us consider independent random variables $Y_1, \ldots, Y_{n}$. Assume in the sequel that there exist independent random variables $Z_1, \ldots, Z_{n}$ such that for each $1 \leq  i \leq  n$, the random vector  $(Y_i,Z_i)$ admits a   parametric probability density function denoted by $f$ parametrized by $\theta \in \Theta$. We present in this section dedicated tools to compute the estimator $I_{n,sco}(\theta)$ in latent variable model when it can not be evaluated analytically.
+
+## Analytical expressions in latent variable models
+
+
+In  latent variable models, the estimator $I_{n,sco}(\theta)$ can be expressed using the conditional expectation as  stated in the following proposition.
+
+::: {#prp-fisherequality}
+Assume that for all $\theta \in\Theta$ the function $\log g(\cdot;\theta)$ is integrable, that for all $y$ the function $\log g(y;\cdot)$ is   differentiable on $\Theta$ and  that there exists an integrable function $m$ such that for all  $\theta \in\Theta$, $\|\ \partial_\theta \log g(y;\theta) \| \leq m(y)$. Then for all $\theta \in \Theta$ and all $n \in \mathbb{N}^*$:
+$$
+I_{n,sco}(\theta) = \frac{1}{n} \sum_{i=1}^n \mathrm{E}_{Z_i|Y_i;\theta} (\partial_\theta \log f(Y_i,Z_i;\theta) ) \mathrm{E}_{Z_i|Y_i;\theta} (\partial_\theta \log f(Y_i,Z_i;\theta) )^t, 
+$$ {#eq-vnmis}
+
+where $\mathrm{E}_{Z|Y;\theta}$ denotes the expectation under the law of $Z$ conditionally to $Y$.
+:::
+
+We apply the classical Fisher identity [@fisher1925] to  establish the equality stated in Proposition @prp-fisherequality.
+This statement  is indeed in the same spirit  as the well-known Louis formulae for the observed Fisher information matrix estimate [@Louis1982].
+
+::: {.remark}
+In some specific cases  the conditional expectations involved in the previous proposition  admit exact analytical expressions for example  in mixture models which are  developed in @sec-simul in some simulation studies. 
+:::
+
+## Computing $I_{n,sco}(\theta)$ using stochastic approximation algorithm
+
+When exact computation of the estimator $I_{n,sco}(\theta)$ is not possible, we propose  to evaluate its value by using a stochastic algorithm which provides the estimate $I_{n,sco}(\theta)$ as a by-product of the parameter estimates of $\theta$.  
+
+### Description of the algorithm in curved exponential family model {#sec-algoSAEM}
+
+We consider an extension of the stochastic approximation Expectation Maximization algorithm proposed by [@Delyon1999] which allows to compute the maximum likelihood estimate in general latent variables model. We assume that the complete log-likelihood belongs to the curved exponential family  for stating the theoretical results. However our algorithm can be easily extended to general latent variables models (see @sec-generalmodel). As our estimate involves individual conditional expectations, we have to consider an extended form of sufficient  statistics for the model. Therefore we  introduce the following notations and assumptions.
+
+The individual complete data likelihood function is given for all $1 \leq  i \leq  n$ by:
+$$
+f_i(z_i;\theta) = \exp\left(-\psi_i(\theta) + \left<S_i(z_i),\phi_i(\theta)\right>\right),
+$$ {#eq-curvedexpo}
+where $\left<\cdot,\cdot\right>$ denotes the scalar product, $S_i$ is a function on $\mathbb{R}^{d_i}$  taking its values in a subset $\mathcal{S}_i$ of $\mathbb{R}^{m_i}$. 
+
+Let us denote  for all $1 \leq  i \leq  n$ by  $L_i$ the function defined on $\mathcal{S}_i \times \Theta$ by $L_i(s_i; \theta)\triangleq - \psi_i(\theta) + \left<s_i,\phi_i(\theta)\right>$ and by $L: \mathcal{S} \times \Theta \to \mathbb{R}$ the function defined as $L(s,\theta)=\sum_i L_i(s_i; \theta)$ with $\mathcal{S}=\prod_i \mathcal{S}_i$ and $s=(s_1,\ldots,s_n)$.
+For sake of simplicity, we omitted here all dependency on the observations $(y_i)_{1 \leq  i \leq  n}$  since the considered stochasticity relies on the latent variables.
+
+Finally let us denote by $(\gamma_k)_{k \geq 1}$ a sequence of positive step sizes. 
+
+Moreover we assume that there exists a function $\widehat{\theta} : \ \mathcal{S} \rightarrow \Theta$, such that $\forall s \in \mathcal{S}, \ \  \forall \theta \in \Theta, \ \ L(s; \widehat{\theta}(s))\geq L(s; \theta).$
+
+- **Initialization step**: Initialize arbitrarily for all $1 \leq i \leq n$ $s_i^0$ and $\theta_0$. 
+- **Repeat until convergence the  three   steps defined at iteration $k$ by**:
+-  **Simulation  step**:  for $1 \leq i \leq n$ simulate a realization  $Z_i^k$ from  the conditional distribution given the observations $Y_i$ denoted by $p_i$ using  the current parameter value $\theta_{k-1}$. 
+- **Stochastic approximation step**: compute the quantities for all  $1 \leq i \leq n$
+$$
+s_i^{k} = (1-\gamma_k)s_i^{k-1} +\gamma_k  S_i(Z_i^k) 
+$$
+where $(\gamma_k)$ is a sequence of positive step sizes satisfying $\sum \gamma_k=\infty$ and $\sum \gamma_k^2 <~\infty$.
+
+
+- **Maximisation step**: update  of the parameter estimator  according to:
+$$
+\theta_{k} = \argmax_{\theta}  \sum_{i=1}^n \left( -\psi_i(\theta) + \left<s_i^k,\phi_i(\theta)\right>\right) = \hat{\theta}(s^{k})
+$$
+- **When convergence is reached, say  at iteration $K$ of the algorithm, evaluate the FIM estimator according to**:
+$$
+I_{n,sco}^K = \frac{1}{n} \sum_{i=1}^n \hat{\Delta}_i\left(\hat{\theta}\left(s^{K}\right)\right) \hat{\Delta}_i\left(\hat{\theta}\left(s^{K}\right)\right)^t
+$$
+where $\hat{\Delta}_i(\hat{\theta}(s))  =  -\partial \psi_i(\hat{\theta}(s)) + \left<s_i,\partial \phi_i(\hat{\theta}(s))\right>$ for all $s$.
+
+::: {.remark}
+In the cases where the latent variables can not be simulated from the conditional distribution, one can apply the extension coupling the stochastic algorithm with a Monte Carlo Markov Chain procedure as presented in [@Kuhn2004]. All the following results can be extended to this case.
+:::
+
+### Theoretical convergence properties
+
+In addition to the exponential family assumption for each individual likelihood, we also make the same type of regularity assumptions as those presented  in [@Delyon1999] at each individual level. These assumptions are detailed in the appendix section.
+
+::: {#thm-conv.algo}
+Assume that $(M1')$ and  $(M2')$,  $(M3)$ to  $(M5)$ and $(SAEM1)$ to $(SAEM4)$  are fulfilled. Assume also that with probability 1 $\mathrm{clos}(\{s_k\}_{k \geq 1})$ is a compact subset of $\mathcal{S}$. Let us define $\mathcal{L}=\{\theta \in\Theta, \partial_\theta l(y;\theta)=0\}$  the set of stationary points of the observed log-likelihood $l$. Then, for all $\theta_0 \in \Theta$, for fixed $n \in \mathbb{N}^*$, we get: $\lim_k d(\theta_k,\mathcal{L})=0$ and  $\lim_k d(I_{n,sco}^k,\mathcal{I})=0$ where $\mathcal{I}=\{I(\theta), \theta \in \mathcal{L}\}$.
+:::
+
+::: {.proof}
+Let us denote by $S(Z)=(S_1(Z_1),\ldots,S_n(Z_n))$ the sufficient statistics of the model we consider in our approach. Note as recalled in [@Delyon1999], these are not unique. Let us also define $H(Z,s)=S(Z)-s$ and $h(s)=\mathrm{E}_{Z|Y;\theta}(S(Z))-s$.
+Assumptions $(M1')$ and $(M2')$  imply that assumptions  $(M1)$ and $(M2)$ of Theorem 5 of [@Delyon1999] are  fulfilled. Indeed these assumptions focus on expressions and regularity properties of the individual likelihood functions and the corresponding sufficient statistics for each index $i \in \{1,\ldots,n\}$. Then by linearity of the log-likelihood function and of the stochastic approximation and applying Theorem 5 of [@Delyon1999], we get that $\lim_k d(\theta_k,\mathcal{L})=0$. 
+Moreover we get that for $1 \leq i \leq n$, each sequence $(s_i^k)$ converges almost surely toward $\mathrm{E}_{Z_i|Y_i;\theta} (S_i(Z_i) )$.
+Since  assumption $(M2')$ ensures that for all $1 \leq i \leq n$ the functions $\psi_i$ and $\phi_i$ are twice continuously differentiable and assumption $(M5)$ ensures that the function $\hat{\theta}$ is continuously differentiable, the function $\Phi_n$ defined by $\Phi_n(s^{k})=\frac1{n}\sum_{i=1}^n \hat{\Delta}_i(\hat{\theta}(s^{k}))\hat{\Delta}_i(\hat{\theta}(s^{k}))$ is continuous. Therefore  we get that $\lim_k d(I_{n,sco}^k,\mathcal{I})=0$.
+:::
+
+
+We now establish the asymptotic normality of the estimate $\bar{I}_{n,sco}^k$ defined as $\bar{I}_{n,sco}^k=\Phi_n(\bar{s}^{k})$ with $\bar{s}^{k}=\sum_{l=1}^k s^l /k$ using the results stated by [@Delyon1999].  Let us denote by $Vect(A)$ the vector composed of the elements of the triangular superior part of matrix $A$ ordered by columns.
+
+::: {#thm-conv2}
+Assume that $(M1')$ and  $(M2')$,  $(M3)$ to  $(M5)$, $(SAEM1')$,  $(SAEM2)$,  $(SAEM3)$,  $(SAEM4')$ and $(LOC1)$ to $(LOC3)$ are fulfilled.  Then, there exists a regular stable stationary point $\theta^* \in \Theta$ such that $\lim_k \theta_k=\theta^*$ a.s. Moreover  the sequence $(\sqrt{k}(Vect(\bar{I}_{n,sco}^k)-Vect(\bar{I}_{n,sco}(\theta^*))))\mathbb{1}_{\lim \| \theta_k-\theta^*\|=0 }$ converges in distribution toward a centered Gaussian random vector  when $k$ goes to infinity. The asymptotic covariance matrix is characterised.  
+:::
+
+::: {.proof}
+The proof follows the lines of this of Theorem 7 of [@Delyon1999]. 
+Assumptions $(LOC1)$ to $(LOC3)$ are those of [@Delyon1999] and  ensure the existence of a regular stable stationary point $s^*$ for $h$ and therefore of $\theta^*=\hat{\theta}(s^*)$ for the observed log-likelihood $l$. Then applying Theorem 4 of [@Delyon1999], we get that:
+$$
+\sqrt{k}( \bar{s}^k - s^*) \mathbb{1}_{\lim \| s^k-s^*\|=0 } \overset{\mathcal{L}}{ \rightarrow} \mathcal{N}(0, J(s^*)^{-1}  \Gamma(s^*) J(s^*)^{-1}  )\mathbb{1}_{\lim \| s_k-s^*\|=0 }
+$$
+where the function $\Gamma$ defined in assumption $(SAEM4')$ and $J$ is the Jacobian matrix of the function $h$. 
+Applying the Delta method, we get that:
+$$
+\sqrt{k}( Vect(\Phi_n(\bar{s}^k)) - Vect(\Phi_n(s^*))) \mathbb{1}_{\lim \| s^k-s^*\|=0 } \overset{\mathcal{L}}{ \rightarrow} W\mathbb{1}_{\lim \| s^k-s^*\|=0 }
+$$
+where $W \sim \mathcal{N}(0, \partial Vect(\Phi_n (s^*)) J(s^*)^{-1}  \Gamma(s^*) J(s^*)^{-1} \partial Vect(\Phi_n (s^*))^t )$ which leads to the result.
+:::
+
+Note that as usually in stochastic approximation results, the rate $\sqrt{k}$ is achieved when considering an average estimator (see Theorem 7 of [@Delyon1999] *e.g*). 
+
+### Description of the algorithm for general latent variables models {#sec-generalmodel} 
+
+In  general settings, the SAEM algorithm can yet  be applied to approximate numerically the maximum likelihood estimate of the model parameter. Nevertheless  there are no more theoretical garantees of convergence for the algorithm. However we propose an extended version of our algorithm which allows to get an estimate  of the Fisher information matrix as a by-product of the estimation algorithm. 
+
+
+- **Initialization step**:  Initialize arbitrarily $\Delta_i^0$ for all $1 \leq i \leq n$, $Q_0$ and $\theta_0$. 
+- **Repeat until convergence the three steps defined at iteration $k$ by**:
+- **Simulation  step**:  for $1 \leq i \leq n$ simulate a realization  $Z_i^k$ from  the conditional distribution given the observations $Y_i$, $p_i$, using the current parameter $\theta_{k-1}$. 
+- **Stochastic approximation step**: compute the quantities for all  $1 \leq i \leq n$
+$$
+Q_{k}(\theta) = (1-\gamma_k)Q_{k-1}(\theta)+\gamma_k \sum_{i=1}^n \log f(y_i,Z_i^k;\theta)
+$$
+$$
+\Delta_i^{k} = (1-\gamma_k)\Delta_i^{k-1} +\gamma_k \partial_\theta \log f(y_i,Z_i^k;\theta_{k-1})
+$$
+
+
+- **Maximisation step**: update  of the parameter estimator  according to:
+$$
+\theta_{k} = \argmax_{\theta} Q_{k}(\theta).
+$$
+
+- **When convergence is reached, say  at iteration $K$ of the algorithm, evaluate  the FIM estimator according to**:
+$$
+I_{n,sco}^K = \frac{1}{n} \sum_{i=1}^n \Delta_i^K (\Delta_i^K )^t.
+$$
+
+
+We illustrate through simulations  in a nonlinear mixed effects model the performance of this algorithm in @sec-SimusNLMM.
+
+# Simulation study {#sec-simul}
+
+In this section, we investigate both the properties of the estimators $I_{n,sco}(\theta)$ and $I_{n,obs}(\theta)$ when the sample size $n$ grows and the properties of the proposed algorithm when the number of iterations grows. 
+
+## Asymptotic properties of the estimators $I_{n,sco}(\theta)$ and $I_{n,obs}(\theta)$ 
+
+### Simulation settings
+
+First  we consider the following linear mixed effects model $y_{ij} = \beta + z_{i} + \varepsilon_{ij},$
+where $y_{ij} \in \mathbb{R}$ denotes the $j^{th}$ observation of individual $i$, $1\leq i \leq n$, $1\leq j \leq J$, $z_i \in \mathbb{R}$  the unobserved random effect of individual $i$ and $\varepsilon_{ij} \in \mathbb{R}$  the residual term. The random effects $(z_{i})$ are assumed independent and identically distributed such that $z_{i} \underset{i.i.d.}{\sim} \mathcal{N}(0,\eta^2)$, the residuals $(\varepsilon_{ij})$ are assumed independent and identically distributed such that $\varepsilon_{ij} \underset{i.i.d.}{\sim} \mathcal{N}(0,\sigma^2)$ and the sequences $(z_i)$ and $(\varepsilon_{ij})$ are assumed mutually independent. Here, the model parameters are given by $\theta = (\beta, \eta^2, \sigma^2)$. We set $\beta=3$, $\eta^2=2$, $\sigma^2=5$ and $J=12$.
+
+Second we consider the following Poisson mixture model where the distribution of each observation $y_i$ ($1\leq i \leq n$) depends on a state variable $z_i$ which is latent leading to
+$y_i|z_i=k  \sim  \mathcal{P}(\lambda_k)$ with $(z_i=k)  =  \alpha_k$ and $\sum_{k=1}^{K} \alpha_k  = 1.$
+The model parameters are $\theta=(\lambda_1,\ldots,\lambda_K,\alpha_1,\ldots,\alpha_{K-1})$. For the simulation study, we consider a mixture of $K=3$ components, and the following values for the parameters $\lambda_1=2$, $\lambda_2=5$, $\lambda_3=9$, $\alpha_1=0.3$ and $\alpha_2=0.5$.
+
+### Results
+
+For each model, we generate $M=500$ datasets for different  sample sizes $n \in \left\{20,100,500 \right\}$. We do not aim at estimating the model parameters. We assume them to be known, and in the following we denote by $\theta^{\star}$ the true parameter value. For each value of $n$ and for each $1 \leq m \leq M$, we derive $I_{n,sco}^{(m)}(\theta^{\star})$ and $I_{n,obs}^{(m)}(\theta^{\star})$. We compute the empirical bias and the root mean squared deviation of each component $(\ell,\ell')$ of the estimated matrix as:
+$$
+\frac{1}{M} \sum\limits_{m=1}^{M} I_{n,sco,\ell,\ell'}^{(m)}(\theta^\star) - I_{\ell,\ell'}(\theta^\star)  \; \; \;  \mathrm{and} \; \; \; \sqrt{\frac{1}{M} \sum\limits_{m=1}^{M} \left(I_{n,sco,\ell,\ell'}^{(m)}(\theta^\star) - I_{\ell,\ell'}(\theta^\star)\right)^2}.
+$$
+
+In the previous quantities, $I(\theta^\star)$ is explicit in the linear mixed effects model and approximated by a Monte-Carlo estimation based on a large sample size in the Poisson mixture model. The results are presented in @tbl-IscoLMM and @tbl-IobsLMM for the linear mixed effects model and in @tbl-IscoMixt and @tbl-IobsMixt for the mixture model. We observe that whatever the model and whatever the components of $I_{n,sco}(\theta^{\star})$ and $I_{n,obs}(\theta^{\star})$, the bias is very small even for small values of $n$. Note that in this particular model the second derivatives with respect to parameter $\beta$ is deterministic, which explains why the bias and the dispersion of the estimations $I_{n,obs}(\theta^{\star})$ are zero for every value of $n$. The bias and the standard deviation decrease as $n$ increases overall, which illustrates the consistency of both M-estimators. The distributions of the normalized estimations $\sqrt{n} \left(I_{n,sco}^{(m)}(\theta^\star) - I(\theta^\star)\right)$ and $\sqrt{n} \left(I_{n,obs}^{(m)}(\theta^\star) - I(\theta^\star)\right)$ are also represented when $n=500$ for some components of the matrices in @fig-simuLMM (linear mixed effects model) and @fig-simuPoissonMixture (Poisson mixture model). The empirical distributions have the shape of Gaussian distributions and illustrate the asymptotic normality of the two estimators. The numerical results highlight that neither $I_{n,sco}(\theta^{\star})$ nor $I_{n,obs}(\theta^{\star})$ is systematically better than the other one in terms of bias and asymptotic covariance matrix. In the same model, different behaviours can be observed depending on the components of the parameter vector.
+
+
+```{r}
+#| label: simuLMM
+#| warning: false
+#| echo: false
+
+## Numerical study in the linear mixed effects model
+## This script performs the experiment for a single value of n (n=500). Several values of n are used to generate the results tables @tbl-IscoLMM and @tbl-IobsLMM
+
+nsim <- 500 # number of replicates
+n <- 500 # number of individuals, in c(20,100,500)
+j <- 12 # number of observations per individual
+
+beta <- 3
+sigma2 <- 5 
+eta2 <- 2
+
+resIobs <- array(NA,dim=c(3,3,nsim))
+resIsco <- array(NA,dim=c(3,3,nsim))
+
+## computation of the exact Fisher Information matrix
+crochet <- 2*j*eta2/(sigma2+eta2*j)^2/sigma2^3+4/ (sigma2+eta2*j)^2/sigma2^2 +2/(sigma2+eta2*j)^3/sigma2
+alpha <- n*j*(eta2+sigma2)/sigma2^3 -eta2*n/2*j*(j*eta2+sigma2)*crochet-n*(j-1)/2/sigma2^2 - n/2/(sigma2+eta2*j)^2
+fisher <- cbind(c(n*j/(sigma2+eta2*j),0,0),c(0,n*j^2/2/(sigma2+eta2*j)^2,n*j/2/(sigma2+eta2*j)^2), c(0,n*j/2/(sigma2+eta2*j)^2,alpha))
+fisher <- fisher/n
+
+## loop executing the nsim replicates of the experiment
+for (k in 1:nsim){
+  # data simulation
+  random <- rnorm(n,0,sqrt(eta2))
+  residual <- rnorm(n*j,0,sqrt(sigma2))
+  randompop <- rep(random,j)
+  obs <- beta+randompop+residual
+  datamat<-matrix(obs,n,j)
+  # computation of observed FIM
+  Iobs <- matrix(0,3,3)
+  Iobs[1,1] <- n*j/(sigma2+eta2*j)
+  Iobs[2,1] <- j/(sigma2+eta2*j)^2*sum(obs-beta)
+  Iobs[1,2] <- Iobs[2,1]
+  Iobs[2,2] <- j/(sigma2+eta2*j)^3*sum(apply(datamat-beta,1,sum)^2)-n*j^2/2/(sigma2+eta2*j)^2
+  Iobs[3,1] <- 1/(sigma2+eta2*j)^2*sum(obs-beta)
+  Iobs[1,3] <- Iobs[3,1]
+  Iobs[2,3] <- 1/(sigma2+eta2*j)^3*sum(apply(datamat-beta,1,sum)^2)-n*j/2/(sigma2+eta2*j)^2
+  Iobs[3,2] <- Iobs[2,3]
+  Iobs[3,3] <- 1/(sigma2)^3*sum((obs-beta)^2)-eta2*sum(apply(datamat-beta,1,sum)^2)*(j*eta2/(sigma2+eta2*j)^2/sigma2^3+2/ (sigma2+eta2*j)^2/sigma2^2 +1/(sigma2+eta2*j)^3/sigma2 ) -n*(j-1)/2/sigma2^2 - n/2/(sigma2+eta2*j)^2
+  Iobs <- Iobs/n
+  # computation of the FIM estimator based on the score
+  derivative <- matrix(0,3,n)
+  derivative[1,] <- apply(datamat-beta,1,sum)/(sigma2+eta2*j)
+  derivative[2,] <- apply(datamat-beta,1,sum)^2/2/(sigma2+eta2*j)^2-j/2/(sigma2+eta2*j)
+  derivative[3,] <- apply((datamat-beta)^2,1,sum)/2/sigma2^2 - apply(datamat-beta,1,sum)^2 *eta2*(j*eta2+2*sigma2)/2/sigma2^2/(sigma2+eta2*j)^2 -1/2/(sigma2+eta2*j)-(j-1)/2/sigma2
+  Isco <- derivative%*%t(derivative)/n
+  
+  resIobs[,,k] <- Iobs
+  resIsco[,,k] <- Isco
+}
+
+DataResLMM <- data.frame(EstF11=c(sqrt(n)*(resIsco[1,1,]-fisher[1,1]),sqrt(n)*(resIobs[1,1,]-fisher[1,1])),
+                         EstF22=c(sqrt(n)*(resIsco[2,2,]-fisher[2,2]),sqrt(n)*(resIobs[2,2,]-fisher[2,2])),
+                         EstF33=c(sqrt(n)*(resIsco[3,3,]-fisher[3,3]),sqrt(n)*(resIobs[3,3,]-fisher[3,3])),
+                         EstF12=c(sqrt(n)*(resIsco[1,2,]-fisher[1,2]),sqrt(n)*(resIobs[1,2,]-fisher[1,2])),
+                         EstF13=c(sqrt(n)*(resIsco[1,3,]-fisher[1,3]),sqrt(n)*(resIobs[1,3,]-fisher[1,3])),
+                         EstF23=c(sqrt(n)*(resIsco[2,3,]-fisher[2,3]),sqrt(n)*(resIobs[2,3,]-fisher[2,3])),
+                         Estimate=c(rep('I n,sco',nsim),rep('I n,obs',nsim)))
+```
+
+```{r}
+#| label: fig-simuLMM
+#| warning: false
+#| echo: false
+#| fig-cap: Linear mixed effects model. Kernel density estimates of the normalized values of some components of the estimated Fisher information matrix based on the score (I n,sco) and of the observed Fisher information matrix (I n,obs) computed from the 500 simulated datasets with n=500.
+
+F22 <- ggplot(DataResLMM, aes(EstF22, fill=Estimate)) + 
+  geom_density(alpha=.6) + 
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) + 
+  xlab("") +
+  ylab("") +
+  xlim(-1.5,1.5) +
+  ylim(0,2) +
+  ggtitle(bquote('('~eta^2~','~eta^2~')')) +
+  theme(legend.position = c(0,0.9), plot.title = element_text(size=20,face="bold"))
+
+F33 <- ggplot(DataResLMM, aes(EstF33, fill=Estimate)) + 
+  geom_density(alpha=.6) + 
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) + 
+  xlab("") +
+  ylab("") +
+  xlim(-1.5,1.5) +
+  ylim(0,2) +
+  ggtitle(bquote('('~sigma^2~','~ sigma^2~')')) +
+  theme(legend.position = "none", plot.title = element_text(size=20,face="bold"))
+
+
+F12 <- ggplot(DataResLMM, aes(EstF12, fill=Estimate)) + 
+  geom_density(alpha=.6) + 
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) + 
+  xlab("") +
+  ylab("") +
+  xlim(-1.5,1.5) +
+  ylim(0,2) +
+  ggtitle(bquote('('~beta~','~ eta^2~')')) +
+  theme(legend.position = "none", plot.title = element_text(size=20,face="bold"))
+
+plot_grid(F22, F33, F12, ncol = 3, nrow = 1)
+```
+
+```{r}
+#| label: simuPoissonMixture-functions
+#| echo: false
+
+## Numerical study in the Poisson mixture model
+## R function for Fisher Information matrix estimation 
+
+pm_fisher_estimation <- function(y, n, lambda, alpha) {
+  
+  # y      : vector of observations
+  # n      : sample size
+  # lambda : vector of mean Poisson parameters for each component of the mixture
+  # alpha  : vector of mixture proportions, excluding the proportion of the last mixture component
+  
+  K <- length(lambda)
+  
+  deriv1ind  <- matrix(0,2*K-1,n) 
+  deriv2     <- matrix(0,2*K-1,2*K-1) 
+  covderiv   <- matrix(0,2*K-1,2*K-1)
+  
+  ## computation of conditional expectation of the first derivatives of the complete data log-likelihood
+  
+  denom <- 0
+  for (k in 1:(K-1)){
+    denom <- denom + exp(-lambda[k])*lambda[k]^y*alpha[k]
+  }
+  denom <- denom + exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))
+  
+  for (k in 1:(K-1)){
+    deriv1ind[k,]   <- exp(-lambda[k])*lambda[k]^y*alpha[k]/denom * (y/lambda[k]-1)
+    deriv1ind[K+k,] <- exp(-lambda[k])*lambda[k]^y*alpha[k]/denom/alpha[k] + 
+      exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom*(-1/(1-sum(alpha)))
+  }
+  deriv1ind[K,] <- exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom * (y/lambda[K]-1)
+  
+  
+  ## computation of conditional expectation of the second derivatives of the complete data log-likelihood
+  
+  
+  for (k in 1:(K-1)){
+    deriv2[k,k]     <- sum(exp(-lambda[k])*lambda[k]^y*alpha[k]/denom * (-y/lambda[k]^2))
+    deriv2[K+k,K+k] <- sum(-exp(-lambda[k])*lambda[k]^y*alpha[k]/denom/alpha[k]^2 
+                           + exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom*(-1/(1-sum(alpha))^2))
+  }
+  
+  for (k in 1:(K-2)){
+    for (l in (k+1):(K-1)){
+      deriv2[K+k,K+l] <- sum(exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom*(-1/(1-sum(alpha))^2))
+      deriv2[K+l,K+k] <- deriv2[K+k,K+l] 
+    }
+  }
+  
+  deriv2[K,K]<-sum(exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom * (-y/lambda[K]^2))
+  
+  ## computation of the conditional covariance matrix of the first derivatives of the complete data log-likelihood
+  
+  
+  for (k in 1:(K-2)){
+    covderiv[k,k] <- sum(exp(-lambda[k])*lambda[k]^y*alpha[k]/denom*(-1+y/lambda[k])^2) 
+    covderiv[k+K,k+K] <- sum(exp(-lambda[k])*lambda[k]^y*alpha[k]/denom/alpha[k]^2
+                             +exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom/(1-sum(alpha))^2) 
+    for (l in (k+1):(K-1)){
+      covderiv[k+K,l+K] <- sum(exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom/(1-sum(alpha))^2) 
+      covderiv[l+K,k+K] <- covderiv[k+K,l+K]
+    } 
+    covderiv[k,K+k] <- sum(exp(-lambda[k])*lambda[k]^y*alpha[k]/denom/alpha[k]*(-1+y/lambda[k])) 
+    covderiv[k+K,k] <- covderiv[k,K+k]
+    
+    covderiv[K,K+k] <- sum(exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom*(-1+y/lambda[K])*(-1)/(1-sum(alpha))) 
+    covderiv[K+k,K] <- covderiv[K,K+k]
+  }
+  
+  covderiv[K-1,K-1] <- sum(exp(-lambda[K-1])*lambda[K-1]^y*alpha[K-1]/denom*(-1+y/lambda[K-1])^2) 
+  covderiv[2*K-1,2*K-1] <- sum(exp(-lambda[K-1])*lambda[K-1]^y*alpha[K-1]/denom/alpha[K-1]^2+exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom/(1-sum(alpha))^2) 
+  covderiv[K-1,2*K-1] <- sum(exp(-lambda[K-1])*lambda[K-1]^y*alpha[K-1]/denom/alpha[K-1]*(-1+y/lambda[K-1])) 
+  covderiv[2*K-1,K-1] <- covderiv[K-1,2*K-1]
+  
+  covderiv[K,2*K-1] <- sum(exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom*(-1+y/lambda[K])*(-1)/(1-sum(alpha))) 
+  covderiv[2*K-1,K] <- covderiv[K,2*K-1]
+  
+  covderiv[K,K] <- sum(exp(-lambda[K])*lambda[K]^y*(1-sum(alpha))/denom*(-1+y/lambda[K])^2) 
+  
+  
+  Isco <- deriv1ind%*%t(deriv1ind)/n
+  Iobs <- deriv1ind%*%t(deriv1ind)/n - deriv2/n - covderiv/n
+  
+  
+  res <- list(Isco = Isco, Iobs = Iobs)
+  
+  return(res)
+}
+
+```
+
+
+```{r}
+#| label: simuPoissonMixture-exactFIM-MCMC
+#| eval: false
+#| echo: false
+
+## Numerical study in the Poisson mixture model
+## Monte-Carlo estimation of the true Fisher information matrix based on a large sample
+## Note to the reviewers : This part of the numerical experiment requires a lot of computing time and is therefore not executed directly. Reducing nMC allows us to get back to more reasonable computation times but degrades the quality of the estimation of the FIM by Monte-Carlo. The result of the Monte-Carlo approximation of the FIM obtained with nMC=10^8 is stored in the file PoissonMixtureTrueFIM.Rdata which is loaded in the following chunks.
+
+nMC <- 100000000
+
+z <- rep(0,nMC) # latent variable
+y <- rep(0,nMC) # observed variable
+
+t <- cumsum(c(alpha,1-sum(alpha)))
+
+for (i in 1:nMC){
+  u    <- runif(1)
+  z[i] <- 1+sum(u>t)
+  y[i] <- rpois(1,lambda[z[i]])
+}
+
+trueFIM <-  pm_fisher_estimation(y, nMC, lambda, alpha)
+trueFIM$Iobs
+trueFIM$Isco
+trueFIM <- (trueFIM$Isco+trueFIM$Iobs)/2
+save(trueFIM,file='Rfiles/PoissonMixtureTrueFIM.Rdata')
+```
+
+```{r}
+#| label: simuPoissonMixture-FIM-sco-obs
+#| echo: false
+
+## Numerical study in the Poisson mixture model 
+## This script performs the experiment for a single value of n (n=500). Several values of n are used to generate the results tables @tbl-IscoMixt and @tbl-IobsMixt
+
+nbsim <- 500 # number of replicates
+
+alpha <- c(0.3,0.5) # mixture weights of the first K-1 components 
+lambda <- c(2,5,9)  # parameter values of the K Poisson distribution of the mixture
+
+n <- 500 # sample size, in c(20,100,500)
+
+resIobs <- array(NA,dim=c(5,5,nbsim))
+resIsco <- array(NA,dim=c(5,5,nbsim))
+
+for (j in 1:nbsim){
+  
+  z <- rep(0,n) # latent variable
+  y <- rep(0,n) # observed variable
+  
+  t <- cumsum(c(alpha,1-sum(alpha)))
+  
+  for (i in 1:n){
+    u    <- runif(1)
+    z[i] <- 1+sum(u>t)
+    y[i] <- rpois(1,lambda[z[i]])
+  }
+  
+  res <- pm_fisher_estimation(y, n, lambda, alpha)
+  resIobs[,,j] <- res$Iobs
+  resIsco[,,j] <- res$Isco
+}
+
+load('Rfiles/PoissonMixtureTrueFIM.Rdata')
+DataResPoissonMixture <- data.frame(EstF11=c(sqrt(n)*(resIsco[1,1,]-trueFIM[1,1]),sqrt(n)*(resIobs[1,1,]-trueFIM[1,1])),
+                                    EstF22=c(sqrt(n)*(resIsco[2,2,]-trueFIM[2,2]),sqrt(n)*(resIobs[2,2,]-trueFIM[2,2])),
+                                    EstF33=c(sqrt(n)*(resIsco[3,3,]-trueFIM[3,3]),sqrt(n)*(resIobs[3,3,]-trueFIM[3,3])),
+                                    EstF44=c(sqrt(n)*(resIsco[4,4,]-trueFIM[4,4]),sqrt(n)*(resIobs[4,4,]-trueFIM[4,4])),
+                                    EstF55=c(sqrt(n)*(resIsco[5,5,]-trueFIM[5,5]),sqrt(n)*(resIobs[5,5,]-trueFIM[5,5])),
+                                    EstF12=c(sqrt(n)*(resIsco[1,2,]-trueFIM[1,2]),sqrt(n)*(resIobs[1,2,]-trueFIM[1,2])),
+                                    EstF13=c(sqrt(n)*(resIsco[1,3,]-trueFIM[1,3]),sqrt(n)*(resIobs[1,3,]-trueFIM[1,3])),
+                                    EstF23=c(sqrt(n)*(resIsco[2,3,]-trueFIM[2,3]),sqrt(n)*(resIobs[2,3,]-trueFIM[2,3])),
+                                    EstF35=c(sqrt(n)*(resIsco[3,5,]-trueFIM[3,5]),sqrt(n)*(resIobs[3,5,]-trueFIM[3,5])),
+                                    EstF34=c(sqrt(n)*(resIsco[3,4,]-trueFIM[3,4]),sqrt(n)*(resIobs[3,4,]-trueFIM[3,4])),
+                                    EstF25=c(sqrt(n)*(resIsco[2,5,]-trueFIM[2,5]),sqrt(n)*(resIobs[2,5,]-trueFIM[2,5])),
+                                    EstF24=c(sqrt(n)*(resIsco[2,4,]-trueFIM[2,4]),sqrt(n)*(resIobs[2,4,]-trueFIM[2,4])),
+                                    EstF15=c(sqrt(n)*(resIsco[1,5,]-trueFIM[1,5]),sqrt(n)*(resIobs[1,5,]-trueFIM[1,5])),
+                                    EstF14=c(sqrt(n)*(resIsco[1,4,]-trueFIM[1,4]),sqrt(n)*(resIobs[1,4,]-trueFIM[1,4])),
+                                    Estimate=c(rep('I n,sco',nbsim),rep('I n,obs',nbsim)))
+```
+
+```{r}
+#| label: fig-simuPoissonMixture
+#| warning : false
+#| echo: false
+#| fig-cap: Poisson mixture model. Kernel density estimates of the normalized values of some components of the estimated Fisher information matrix based on the score (I n,sco) and of the observed Fisher information matrix (I n,obs) computed from the 500 simulated datasets with n=500.
+
+
+F11 <- ggplot(DataResPoissonMixture, aes(EstF11, fill=Estimate)) +
+  geom_density(alpha=.6) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  xlim(-1,1) +
+  ggtitle(bquote('('~lambda[1]~','~ lambda[1]~')')) +
+  theme(legend.position = c(-0.05, 0.95), plot.title = element_text(size=20,face="bold"))
+
+F22 <- ggplot(DataResPoissonMixture, aes(EstF22, fill=Estimate)) +
+  geom_density(alpha=.6) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00'))  + 
+  xlab("") +
+  ylab("") +
+  xlim(-0.5,0.5) +
+  ggtitle(bquote('('~lambda[2]~','~ lambda[2]~')')) +
+  theme(legend.position = "none", plot.title = element_text(size=20,face="bold"))
+
+F25 <- ggplot(DataResPoissonMixture, aes(EstF25, fill=Estimate)) +
+  geom_density(alpha=.6) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  xlim(-1.5,1.5) +
+  ggtitle(bquote('('~lambda[2]~','~ alpha[2]~')')) +
+  theme(legend.position = "none", plot.title = element_text(size=20,face="bold"))
+
+plot_grid(F11, F22, F25, ncol = 3, nrow = 1)
+```
+
+
+```{r}
+#| label: tbl-IscoLMM
+#| tbl-cap: Linear mixed effects model. Empirical bias and squared deviation to the Fisher Information matrix of the estimator based on the score for different values of n.
+#| echo: false
+#| warning: false
+#| message: false
+
+load("Rfiles/simusLin_n20.Rdata")
+biasIscoLMM20 <- apply(res$Isco,c(1,2),mean) - res$fisher
+sdIscoLMM20 <- apply(res$Isco,c(1,2),sd)
+
+
+load("Rfiles/simusLin_n100.Rdata")
+biasIscoLMM100 <- apply(res$Isco,c(1,2),mean) - res$fisher
+sdIscoLMM100 <- apply(res$Isco,c(1,2),sd)
+
+load("Rfiles/simusLin_n500.Rdata")
+biasIscoLMM500 <- apply(res$Isco,c(1,2),mean) - res$fisher
+sdIscoLMM500 <- apply(res$Isco,c(1,2),sd)
+
+dataIscoLMM <- cbind(component = c(1,2,3,4,5,6),
+                     m20 = c(diag(biasIscoLMM20),biasIscoLMM20[upper.tri(biasIscoLMM20)]),
+                     s20 = c(diag(sdIscoLMM20),sdIscoLMM20[upper.tri(sdIscoLMM20)]),
+                     m100 = c(diag(biasIscoLMM100),biasIscoLMM100[upper.tri(biasIscoLMM100)]),
+                     s100 = c(diag(sdIscoLMM100),sdIscoLMM100[upper.tri(sdIscoLMM100)]),
+                     m500 = c(diag(biasIscoLMM500),biasIscoLMM500[upper.tri(biasIscoLMM500)]),
+                     s500 = c(diag(sdIscoLMM500),sdIscoLMM500[upper.tri(sdIscoLMM500)]))
+
+dataIscoLMM <- as.data.frame(dataIscoLMM)
+dataIscoLMM$component <-factor(dataIscoLMM$component, levels=c(1,2,3,4,5,6),
+                               labels=c("1"='(β,β)',
+                                        "2"='(η2,η2)',
+                                        "3"='(σ2,σ2)',
+                                        "4"='(β,η2)',
+                                        "5"='(β,σ2)',
+                                        "6"='(η2,σ2)'))
+dataIscoLMM <- flextable(dataIscoLMM, cwidth=1.2) 
+dataIscoLMM <- add_header_row(
+  x = dataIscoLMM, values = c("", "n=20", "n=100", "n=500"),
+  colwidths = c(1, 2, 2, 2))
+dataIscoLMM <- set_header_labels(dataIscoLMM, m20="mean", s20="sd", m100="mean", s100="sd", m500="mean", s500="sd", component="")
+dataIscoLMM <- align(dataIscoLMM, part = "all", align = "center")
+dataIscoLMM
+```
+
+```{r}
+#| label: tbl-IobsLMM
+#| tbl-cap: Linear mixed effects model. Empirical bias and squared deviation to the Fisher Information matrix of the observed Fisher Information matrix for different values of n.
+#| echo: false
+#| warning: false
+#| message: false
+
+load("Rfiles/simusLin_n20.Rdata")
+biasIobsLMM20 <- apply(res$Iobs,c(1,2),mean) - res$fisher
+sdIobsLMM20 <- apply(res$Iobs,c(1,2),sd)
+
+
+load("Rfiles/simusLin_n100.Rdata")
+biasIobsLMM100 <- apply(res$Iobs,c(1,2),mean) - res$fisher
+sdIobsLMM100 <- apply(res$Iobs,c(1,2),sd)
+
+load("Rfiles/simusLin_n500.Rdata")
+biasIobsLMM500 <- apply(res$Iobs,c(1,2),mean) - res$fisher
+sdIobsLMM500 <- apply(res$Iobs,c(1,2),sd)
+
+dataIobsLMM <- cbind(component = c(1,2,3,4,5,6),
+                     m20 = c(diag(biasIobsLMM20),biasIobsLMM20[upper.tri(biasIobsLMM20)]),
+                     s20 = c(diag(sdIobsLMM20),sdIobsLMM20[upper.tri(sdIobsLMM20)]),
+                     m100 = c(diag(biasIobsLMM100),biasIobsLMM100[upper.tri(biasIobsLMM100)]),
+                     s100 = c(diag(sdIobsLMM100),sdIobsLMM100[upper.tri(sdIobsLMM100)]),
+                     m500 = c(diag(biasIobsLMM500),biasIobsLMM500[upper.tri(biasIobsLMM500)]),
+                     s500 = c(diag(sdIobsLMM500),sdIobsLMM500[upper.tri(sdIobsLMM500)]))
+
+dataIobsLMM <- as.data.frame(dataIobsLMM)
+dataIobsLMM$component <-factor(dataIobsLMM$component, levels=c(1,2,3,4,5,6),
+                               labels=c("1"='(β,β)',
+                                        "2"='(η2,η2)',
+                                        "3"='(σ2,σ2)',
+                                        "4"='(β,η2)',
+                                        "5"='(β,σ2)',
+                                        "6"='(η2,σ2)'))
+dataIobsLMM <- flextable(dataIobsLMM, cwidth=1.2) 
+dataIobsLMM <- add_header_row(
+  x = dataIobsLMM, values = c("", "n=20", "n=100", "n=500"),
+  colwidths = c(1, 2, 2, 2))
+dataIobsLMM <- set_header_labels(dataIobsLMM, m20="mean", s20="sd", m100="mean", s100="sd", m500="mean", s500="sd", component="")
+dataIobsLMM <- align(dataIobsLMM, part = "all", align = "center")
+dataIobsLMM
+```
+
+
+```{r}
+#| label: tbl-IscoMixt
+#| tbl-cap: Poisson mixture model. Empirical bias and squared deviation to the Fisher Information matrix of the estimator based on the score for different values of n.
+#| echo: false
+#| warning: false
+#| message: false
+
+load("Rfiles/simusMixt_n20.Rdata")
+biasIscoMixt20 <- apply(ResSim$Isco,c(1,2),mean) - trueFIM
+sdIscoMixt20 <- apply(ResSim$Isco,c(1,2),sd)
+
+
+load("Rfiles/simusMixt_n100.Rdata")
+biasIscoMixt100 <- apply(ResSim$Isco,c(1,2),mean) - trueFIM
+sdIscoMixt100 <- apply(ResSim$Isco,c(1,2),sd)
+
+load("Rfiles/simusMixt_n500.Rdata")
+biasIscoMixt500 <- apply(ResSim$Isco,c(1,2),mean) - trueFIM
+sdIscoMixt500 <- apply(ResSim$Isco,c(1,2),sd)
+
+dataIscoMixt <- cbind(component = c(1,2,3,4,5,6),
+                      m20 = c(diag(biasIscoMixt20)[2:5],biasIscoMixt20[2,3],biasIscoMixt20[3,5]),
+                      s20 = c(diag(sdIscoMixt20)[2:5],sdIscoMixt20[2,3],sdIscoMixt20[3,5]),
+                      m100 = c(diag(biasIscoMixt100)[2:5],biasIscoMixt100[2,3],biasIscoMixt100[3,5]),
+                      s100 = c(diag(sdIscoMixt100)[2:5],sdIscoMixt100[2,3],sdIscoMixt100[3,5]),
+                      m500 = c(diag(biasIscoMixt500)[2:5],biasIscoMixt500[2,3],biasIscoMixt500[3,5]),
+                      s500 = c(diag(sdIscoMixt500)[2:5],sdIscoMixt500[2,3],sdIscoMixt500[3,5]))
+
+dataIscoMixt <- as.data.frame(dataIscoMixt)
+dataIscoMixt$component <-factor(dataIscoMixt$component, levels=c(1,2,3,4,5,6),
+                                labels=c("1"='(λ2,λ2)',
+                                         "2"='(λ3,λ3)',
+                                         "3"='(α1,α1)',
+                                         "4"='(α2,α2)',
+                                         "5"='(λ2,λ3)',
+                                         "6"='(λ3,α2)'))
+dataIscoMixt <- flextable(dataIscoMixt, cwidth=1.2) 
+dataIscoMixt <- add_header_row(
+  x = dataIscoMixt, values = c("", "n=20", "n=100", "n=500"),
+  colwidths = c(1, 2, 2, 2))
+dataIscoMixt <- set_header_labels(dataIscoMixt, m20="mean", s20="sd", m100="mean", s100="sd", m500="mean", s500="sd", component="")
+dataIscoMixt <- align(dataIscoMixt, part = "all", align = "center")
+dataIscoMixt
+```
+
+```{r}
+#| label: tbl-IobsMixt
+#| tbl-cap: Poisson mixture model. Empirical bias and squared deviation to the Fisher Information matrix of the observed Fisher Information matrix for different values of n.
+#| echo: false
+#| warning: false
+#| message: false
+
+load("Rfiles/simusMixt_n20.Rdata")
+biasIobsMixt20 <- apply(ResSim$Iobs,c(1,2),mean) - trueFIM
+sdIobsMixt20 <- apply(ResSim$Iobs,c(1,2),sd)
+
+
+load("Rfiles/simusMixt_n100.Rdata")
+biasIobsMixt100 <- apply(ResSim$Iobs,c(1,2),mean) - trueFIM
+sdIobsMixt100 <- apply(ResSim$Iobs,c(1,2),sd)
+
+load("Rfiles/simusMixt_n500.Rdata")
+biasIobsMixt500 <- apply(ResSim$Iobs,c(1,2),mean) - trueFIM
+sdIobsMixt500 <- apply(ResSim$Iobs,c(1,2),sd)
+
+dataIobsMixt <- cbind(component = c(1,2,3,4,5,6),
+                      m20 = c(diag(biasIobsMixt20)[2:5],biasIobsMixt20[2,3],biasIobsMixt20[3,5]),
+                      s20 = c(diag(sdIobsMixt20)[2:5],sdIobsMixt20[2,3],sdIobsMixt20[3,5]),
+                      m100 = c(diag(biasIobsMixt100)[2:5],biasIobsMixt100[2,3],biasIobsMixt100[3,5]),
+                      s100 = c(diag(sdIobsMixt100)[2:5],sdIobsMixt100[2,3],sdIobsMixt100[3,5]),
+                      m500 = c(diag(biasIobsMixt500)[2:5],biasIobsMixt500[2,3],biasIobsMixt500[3,5]),
+                      s500 = c(diag(sdIobsMixt500)[2:5],sdIobsMixt500[2,3],sdIobsMixt500[3,5]))
+
+dataIobsMixt <- as.data.frame(dataIobsMixt)
+dataIobsMixt$component <-factor(dataIobsMixt$component, levels=c(1,2,3,4,5,6),
+                                labels=c("1"='(λ2,λ2)',
+                                         "2"='(λ3,λ3)',
+                                         "3"='(α1,α1)',
+                                         "4"='(α2,α2)',
+                                         "5"='(λ2,λ3)',
+                                         "6"='(λ3,α2)'))
+dataIobsMixt <- flextable(dataIobsMixt, cwidth=1.2) 
+dataIobsMixt <- add_header_row(
+  x = dataIobsMixt, values = c("", "n=20", "n=100", "n=500"),
+  colwidths = c(1, 2, 2, 2))
+dataIobsMixt <- set_header_labels(dataIobsMixt, m20="mean", s20="sd", m100="mean", s100="sd", m500="mean", s500="sd", component="")
+dataIobsMixt <- align(dataIobsMixt, part = "all", align = "center")
+dataIobsMixt
+```
+## Asymptotic properties of the stochastic approximation algorithm {#sec-SimusNLMM}
+
+### In curved exponential family model
+
+We consider the following nonlinear mixed effects model which is widely used in pharmacokinetics for describing the evolution of drug concentration over time:
+$$
+y_{ij}=\frac{d_i ka_{i}}{V_i ka_{i}-Cl_{i}}\left[e^{-\frac{Cl_{i}}{V_i} t_{ij}} - e^{-ka_{i} t_{ij}}\right] + \varepsilon_{ij},
+$$ {#eq-modelPK}
+where $ka_i$,  $Cl_i$ and $V_i$ are individual random parameters such that $\log ka_{i}  =  \log(ka) + z_{i,1}$, $\log Cl_{i}  =  \log(Cl) + z_{i,2}$, $\log V_i  =  \log(V) + z_{i,3}$. For all $1 \leq i \leq n$, $1\leq j \leq J$, $y_{ij}$ denotes the measure of drug concentration on individual $i$  at time $t_{ij}$, $d_i$  the dose of drug administered to individual i, and $V_i$, $ka_i$ and $Cl_i$ respectively denote the volume of the central compartment, the drug's absorption rate constant and the drug's clearance of individual $i$. 
+The terms $z_{i} = (z_{i,1},z_{i,2},z_{i,3})' \in \mathbb{R}^3$ are unobserved random effects which are assumed independent and identically distributed such that $z_i \underset{i.i.d.}{\sim} \mathcal{N}(0,\Omega)$, where $\Omega = \mathrm{diag}(\omega^2_{ka},\omega^2_{Cl},\omega^2_{V})$, the residuals $(\varepsilon_{ij})$ are assumed independent and identically distributed such that $\varepsilon_{ij} \underset{i.i.d.}{\sim} \mathcal{N}(0,\sigma^2)$ and the sequences $(z_i)$ and $(\varepsilon_{ij})$ are assumed mutually independent. Here, the model parameter is given by $\theta = (ka,V,Cl,\omega^2_{ka},\omega^2_{V},\omega^2_{Cl},\sigma^2)$. In this model, as in a large majority of nonlinear mixed effects models, the likelihood does not have any analytical expression. As a consequence, neither the Fisher Information Matrix, nor the estimators $I_{n,sco}(\theta)$, $I_{n,obs}(\theta)$ have explicit expressions. However, as the complete data log-likelihood is explicit, stochastic approximations of $I_{n,sco}(\theta)$, $I_{n,obs}(\theta)$ can be implemented. We take the following values for the parameters $V=31$, $ka=1.6$, $Cl=2.8$, $\omega^2_V=0.40$, $\omega^2_{ka}=0.40$, $\omega^2_{Cl}=0.40$ and $\sigma^2=0.75$. We consider the same dose $d_i=320$ and the same observation times (in hours): $0.25$,$0.5$, $1$, $2$, $3.5$, $5$, $7$, $9$, $12$, $24$ for all the individuals. We simulate one dataset with $n=100$ individuals under model specified by @eq-modelPK. On this simulated dataset, we run the stochastic approximation algorithm described in @sec-algoSAEM for computing $I_{n,sco}(\hat{\theta})$ together with $\hat{\theta}$ and the algorithm of [@Delyon1999] for computing $I_{n,obs}(\hat{\theta})$ $M=500$ times. We perform $K=3000$ iterations in total for each algorithm by setting $\gamma_k=0.95$ for $1 \leq k \leq 1000$ (burn in iterations) and $\gamma_k=(k-1000)^{-3/5}$ otherwise. At any iteration, we compute the empirical relative bias and the empirical relative standard deviation of each component $(\ell,\ell')$ of $I_{n,sco}$ defined respectively as: 
+$$
+\frac{1}{M} \sum\limits_{m=1}^{M} \frac{\widehat{I_{n,sco,\ell,\ell'}^{(k,m)}} - I_{n,sco,\ell,\ell'}^{\star}}{I_{n,sco,\ell,\ell'}^{\star}} \; \; \; \mathrm{and} 
+\; \; \; \sqrt{\frac{1}{M} \sum\limits_{m=1}^{M} \left(\frac{\widehat{I_{n,sco,\ell,\ell'}^{(k,m)}} - I_{n,sco,\ell,\ell'}^{\star}}{I_{n,sco,\ell,\ell'}^{\star}}
+\right)^2} 
+$$
+where $\widehat{I_{n,sco}^{(k,m)}}$ denotes the estimated value of $I_{n,sco}(\hat{\theta})$ at iteration $k$ of the $m^{th}$ algorithm. We compute the same quantities for $I_{n,obs}$. As the true values of $I_{n,sco}^{\star}=I_{n,sco}(\theta^{\star})$ and $I_{n,obs}^{\star}=I_{n,obs}(\theta^{\star})$ are not known, they are estimated by Monte-Carlo integration. The results are displayed in @fig-BiaisNonLin and @fig-SdNonLin.
+
+
+::: {#fig-BiaisNonLin}
+
+![](figures/Biais.png)
+
+Non linear mixed effects model. Representation over iterations of the mean relative bias of the diagonal components of the estimated Fisher information matrix computed from the $M=500$ runs of the stochastic algorithm. Red line corresponds to $I_{n,sco}(\theta)$ and blue line corresponds to $I_{n,obs}(\theta)$. The burn-in iterations of the algorithm are not depicted.
+:::
+
+
+::: {#fig-SdNonLin}
+
+![](figures/RSD.png)
+
+Non linear mixed effects model. Representation over iterations of the mean relative standard error of the diagonal components of the estimated Fisher information matrix computed from the $M=500$ runs of the stochastic algorithm. Red line corresponds to $I_{n,sco}(\theta)$ and blue line corresponds to $I_{n,obs}(\theta)$. The burn-in iterations of the algorithme are not depicted.
+:::
+
+
+```{r}
+#| label: simusNLMEexponentialfunctions
+#| echo: false
+
+## R functions for the numerical study in the non linear mixed effects model belonging to the curved exponential family
+
+## 1. R function for computing the parameter estimates and the FIM estimates simultaneously
+
+saem <- function(data, nbiterem, nbiterburnin, theta0, kRW=0.5) {
+  
+  # data         : dataset 
+  # nbiterem     : total number of iterations of the saem algorithm
+  # nbiterburnin : number of burn-in iterations of the algorithm
+  # theta0       : initial parameter values
+  # kRW          : coefficient used to adjust the variance of the proposal kernel of the MCMC procedure
+  
+  # data processing
+  xidep <- cbind(data$dose,data$time)
+  y     <- data$y
+  id    <- as.matrix(data$subject)
+  n     <- length(unique(id))
+  j     <- length(unique(data$time))
+  
+  
+  # Model function
+  
+  model1cpt<-function(psi,id,xidep) { 
+    dose  <- xidep[,1]
+    tim   <- xidep[,2]  
+    ka    <- psi[id,1]
+    V     <- psi[id,2]
+    CL    <- psi[id,3]
+    k     <- CL/V
+    ypred <- dose*ka/(V*(ka-k))*(exp(-k*tim)-exp(-ka*tim))
+    return(ypred)
+  }
+  
+  # initial parameter values
+  
+  vpop     <- theta0$vpop
+  kapop    <- theta0$kapop
+  clpop    <- theta0$clpop
+  omega2v  <- theta0$omega2v
+  omega2ka <- theta0$omega2ka
+  omega2cl <- theta0$omega2cl
+  sigma2   <- theta0$sigma2
+  
+  p <- length(theta0)
+  
+  thetaest     <-  matrix(0,p,nbiterem)
+  thetaest[,1] <- c(kapop,vpop,clpop,omega2ka,omega2v,omega2cl,sigma2)
+  
+  
+  # variances of the proposal kernels of the MCMC procedure
+  eta2v  <- kRW*omega2v
+  eta2ka <- kRW*omega2ka
+  eta2cl <- kRW*omega2cl
+  
+  # sequence of step sizes
+  gamma <-c(rep(0.95,nbiterburnin), 1/(2:nbiterem)^0.6)
+  
+  # intermediary R objects
+  deltaindi      <- array(0,c(p,n,nbiterem))
+  H              <- array(0,c(p,p,n,nbiterem))
+  G2             <- array(0,c(p,p,nbiterem))
+  tempderiveeas  <-matrix(0,p,n)
+  tempderiveeas2 <-matrix(0,p,p)
+  dimstatexh     <- 7
+  statexh        <- matrix(0,dimstatexh,nbiterem)
+  
+  
+  # initial values for the individual parameters
+  
+  currentv   <- log(vpop)  + rnorm(n,0,sqrt(eta2v))
+  currentka  <- log(kapop) + rnorm(n,0,sqrt(eta2ka))
+  currentcl  <- log(clpop) + rnorm(n,0,sqrt(eta2cl))
+  currentpsi <- cbind(exp(currentka),exp(currentv),exp(currentcl))
+  
+  ## Start of the em loop
+  for (l in 1:(nbiterem-1)){
+    
+    ## Simulation step
+    for (k in 1:(n)){
+      
+      ## Variable ka
+      candidatka    <- currentka
+      candidatka[k] <- candidatka[k] + rnorm(1,0,sqrt(eta2ka))
+      psicandidat   <- cbind(exp(candidatka),exp(currentv),exp(currentcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep))^2)+1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep))^2)
+      logs          <- logs-1/2/omega2ka*((candidatka[k]-log(kapop))^2-(currentka[k]-log(kapop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind+currentpsi*(1-ind)
+      currentka     <- candidatka*ind+currentka*(1-ind)
+      
+      ## Variable V
+      candidatv    <- currentv
+      candidatv[k] <- candidatv[k] + rnorm(1,0,sqrt(eta2v))
+      psicandidat  <- cbind(exp(currentka),exp(candidatv),exp(currentcl))
+      logs         <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep))^2)+ 1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep))^2)
+      logs         <- logs -1/2/omega2v*((candidatv[k]-log(vpop))^2-(currentv[k]-log(vpop))^2)
+      u            <- runif(1)
+      logu         <- log(u)
+      ind          <- (logu<logs)
+      currentpsi   <- psicandidat*ind+currentpsi*(1-ind)
+      currentv     <- candidatv*ind+currentv*(1-ind)
+      
+      ## Variable cl
+      candidatcl    <- currentcl
+      candidatcl[k] <- candidatcl[k] + rnorm(1,0,sqrt(eta2cl))
+      psicandidat   <- cbind(exp(currentka),exp(currentv),exp(candidatcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep))^2)+ 1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep))^2)
+      logs          <- logs -1/2/omega2cl*((candidatcl[k]-log(clpop))^2-(currentcl[k]-log(clpop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind+currentpsi*(1-ind)
+      currentcl     <- candidatcl*ind+currentcl*(1-ind)
+      
+    }
+    
+    psi <- currentpsi
+    
+    # stochastic approximation of exhaustive statistics and parameter estimation update
+    
+    mco           <- matrix((y-model1cpt(psi,id,xidep))^2,n,j,byrow=TRUE)
+    mcos          <- apply(mco,1,sum)
+    STATEXH       <- c(apply(log(psi),2,mean), apply(log(psi)^2,2,mean), sum(mcos))
+    statexh[,l+1] <- statexh[,l]*(1-gamma[l])+gamma[l]*STATEXH
+    
+    
+    kapop    <- exp(statexh[1,l+1])
+    vpop     <- exp(statexh[2,l+1])
+    clpop    <- exp(statexh[3,l+1])
+    omega2ka <- statexh[4,l+1]-statexh[1,l+1]^2
+    omega2v  <- statexh[5,l+1]-statexh[2,l+1]^2
+    omega2cl <- statexh[6,l+1]-statexh[3,l+1]^2
+    sigma2   <- statexh[7,l+1]/n/j
+    
+    thetaest[,l+1] <- c(kapop, vpop, clpop, omega2ka, omega2v, omega2cl, sigma2)
+    
+    eta2ka   <- kRW*omega2ka
+    eta2v    <- kRW*omega2v
+    eta2cl   <- kRW*omega2cl
+    
+    ## Stochastic approximation of the derivatives of the complete log-likelihood
+    
+    
+    tempderiveeas[1,]<- (log(psi[,1])-log(kapop))/omega2ka/kapop
+    tempderiveeas[2,]<- (log(psi[,2])-log(vpop))/omega2v/vpop
+    tempderiveeas[3,]<- (log(psi[,3])-log(clpop))/omega2cl/clpop
+    tempderiveeas[4,]<- -1/2/omega2ka +1/2/omega2ka^2*(log(psi[,1])-log(kapop))^2
+    tempderiveeas[5,]<- -1/2/omega2v +1/2/omega2v^2*(log(psi[,2])-log(vpop))^2
+    tempderiveeas[6,]<- -1/2/omega2cl +1/2/omega2cl^2*(log(psi[,3])-log(clpop))^2
+    tempderiveeas[7,]<- -j/2/sigma2+apply(mco,1,sum)/2/sigma2^2
+    
+    
+    tempderiveeas2[1,1] <-  sum(-log(psi[,1])+log(kapop)-1)/omega2ka/kapop^2
+    tempderiveeas2[2,2] <-  sum(-log(psi[,2])+log(vpop)-1)/omega2v/vpop^2
+    tempderiveeas2[3,3] <-  sum(-log(psi[,3])+log(clpop)-1)/omega2cl/clpop^2
+    tempderiveeas2[4,4] <-  n/2/omega2ka^2 -1/omega2ka^3*sum((log(psi[,1])-log(kapop))^2)
+    tempderiveeas2[5,5] <-  n/2/omega2v^2 -1/omega2v^3*sum((log(psi[,2])-log(vpop))^2)
+    tempderiveeas2[6,6] <-  n/2/omega2cl^2 -1/omega2cl^3*sum((log(psi[,3])-log(clpop))^2)
+    tempderiveeas2[7,7] <-  n*j/2/sigma2^2-sum((y-model1cpt(psi,id,xidep))^2)/sigma2^3
+    tempderiveeas2[1,4] <- -sum(log(psi[,1])-log(kapop))/omega2ka^2/kapop
+    tempderiveeas2[2,5] <- -sum(log(psi[,2])-log(vpop))/omega2v^2/vpop
+    tempderiveeas2[3,6] <- -sum(log(psi[,3])-log(clpop))/omega2cl^2/clpop
+    tempderiveeas2[4,1] <- tempderiveeas2[1,4]
+    tempderiveeas2[5,2] <- tempderiveeas2[2,5]
+    tempderiveeas2[6,3] <- tempderiveeas2[3,6]
+    
+    
+    deltaindi[,,l+1] <- deltaindi[,,l]*(1-gamma[l])+gamma[l]*tempderiveeas
+    for (i in 1:n){
+      H[,,i,l+1]<-H[,,i,l]*(1-gamma[l])+gamma[l]*(tempderiveeas[,i]%*%t(tempderiveeas[,i]))
+    }
+    G2[,,l+1] <- G2[,,l]*(1-gamma[l])+gamma[l]*(tempderiveeas2/n)
+  }
+  ## End of the em loop
+  
+  ## Computation of the FIM estimations
+  
+  isco <- array(0,c(p,p,nbiterem)) # estimation based on the score
+  iobs <- array(0,c(p,p,nbiterem)) # estimation based on the observed information matrix
+  SH   <- vector("list",nbiterem)
+  
+  
+  for (t in 1:nbiterem){
+    isco[,,t] <- deltaindi[,,t]%*%t(deltaindi[,,t])/n
+    SH[[t]]<-matrix(0,p,p)
+    for (i in 1:n){
+      SH[[t]]<-SH[[t]]+H[,,i,t]
+    }
+    iobs[,,t] <- -G2[,,t] - SH[[t]]/n + isco[,,t]
+  }
+  
+  res <- list(thetaest = thetaest, isco = isco, iobs = iobs)
+  
+  return(res)
+}
+
+## 2. R function computing Monte-carlo estimation of the FIM
+
+FIM_mc <- function(data, nbMC, nbMCburnin, theta, kRW=0.5) {
+  
+  # data       : dataset 
+  # nbMC       : total number of iterations of Monte-Carlo iterations
+  # nbMCburnin : number of burn-in iterations 
+  # theta      : parameter values
+  # kRW        : coefficient used to adjust the variance of the proposal kernel of the MCMC procedure
+  
+  
+  # data processing
+  xidep <- cbind(data$dose,data$time)
+  y     <- data$y
+  id    <- as.matrix(data$subject)
+  n     <- length(unique(id))
+  j     <- length(unique(data$time))
+  
+  # Model function
+  
+  model1cpt<-function(psi,id,xidep) { 
+    dose  <- xidep[,1]
+    tim   <- xidep[,2]  
+    ka    <- psi[id,1]
+    V     <- psi[id,2]
+    CL    <- psi[id,3]
+    k     <- CL/V
+    ypred <- dose*ka/(V*(ka-k))*(exp(-k*tim)-exp(-ka*tim))
+    return(ypred)
+  }
+  
+  # parameter values 
+  
+  vpop     <- theta$vpop
+  kapop    <- theta$kapop
+  clpop    <- theta$clpop
+  omega2v  <- theta$omega2v
+  omega2ka <- theta$omega2ka
+  omega2cl <- theta$omega2cl
+  sigma2   <- theta$sigma2
+  
+  p <- length(theta)
+  
+  # variances of the proposal kernels of the MCMC procedure
+  eta2v  <- kRW*omega2v
+  eta2ka <- kRW*omega2ka
+  eta2cl <- kRW*omega2cl
+  
+  # intermediary R quantities
+  psiMC          <- array(0,c(n,3,nbMC))
+  iscoMC         <- array(0,c(p,p,nbMC))
+  iobsMC         <- array(0,c(p,p,nbMC))
+  temp2MC        <- array(0,c(p,p,nbMC))
+  temp3MC        <- array(0,c(p,p,nbMC))
+  tempderiveeMC  <- array(0,c(p,n,nbMC))
+  tempderiveeMC2 <- array(0,c(p,p,nbMC))
+  
+  # initial values for the individual parameters
+  currentv   <- log(vpop) + rnorm(n,0,sqrt(eta2v))
+  currentka  <- log(kapop) + rnorm(n,0,sqrt(eta2ka))
+  currentcl  <- log(clpop) + rnorm(n,0,sqrt(eta2cl))
+  currentpsi <- cbind(exp(currentka),exp(currentv),exp(currentcl))
+  
+  # simulate a markov chain with stationnary distribution p(psi|y) 
+  
+  # burn-in
+  
+  for (m in 1:nbMCburnin){
+    
+    for (k in 1:n){
+      
+      # variable ka 
+      
+      candidatka    <- currentka
+      candidatka[k] <- candidatka[k] + rnorm(1,0,sqrt(eta2ka))
+      psicandidat   <- cbind(exp(candidatka),exp(currentv),exp(currentcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep))^2)+1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep))^2)
+      logs          <- logs-1/2/omega2ka*((candidatka[k]-log(kapop))^2-(currentka[k]-log(kapop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind+currentpsi*(1-ind)
+      currentka     <- candidatka*ind+currentka*(1-ind)
+      
+      # variable v 
+      
+      candidatv     <- currentv
+      candidatv[k]  <- candidatv[k] + rnorm(1,0,sqrt(eta2v))
+      psicandidat   <- cbind(exp(currentka),exp(candidatv),exp(currentcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep))^2)+1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep))^2)
+      logs          <- logs-1/2/omega2v*((candidatv[k]-log(vpop))^2-(currentv[k]-log(vpop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind+currentpsi*(1-ind)
+      currentv      <- candidatv*ind+currentv*(1-ind)
+      
+      # variable cl 
+      
+      candidatcl    <- currentcl
+      candidatcl[k] <- candidatcl[k] + rnorm(1,0,sqrt(eta2cl))
+      psicandidat   <- cbind(exp(currentka),exp(currentv),exp(candidatcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep))^2)+1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep))^2)
+      logs          <- logs-1/2/omega2cl*((candidatcl[k]-log(clpop))^2-(currentcl[k]-log(clpop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind+currentpsi*(1-ind)
+      currentcl     <- candidatcl*ind+currentcl*(1-ind)
+      
+    }
+  }
+  
+  
+  for (m in 1:nbMC){
+    
+    for (k in 1:n){
+      
+      # variable ka 
+      
+      candidatka    <- currentka
+      candidatka[k] <- candidatka[k] + rnorm(1,0,sqrt(eta2ka))
+      psicandidat   <- cbind(exp(candidatka),exp(currentv),exp(currentcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep))^2)+1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep))^2)
+      logs          <- logs-1/2/omega2ka*((candidatka[k]-log(kapop))^2-(currentka[k]-log(kapop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind+currentpsi*(1-ind)
+      currentka     <- candidatka*ind+currentka*(1-ind)
+      
+      # variable v 
+      
+      candidatv     <- currentv
+      candidatv[k]  <-candidatv[k] + rnorm(1,0,sqrt(eta2v))
+      psicandidat   <- cbind(exp(currentka),exp(candidatv),exp(currentcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep))^2)+1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep))^2)
+      logs          <- logs-1/2/omega2v*((candidatv[k]-log(vpop))^2-(currentv[k]-log(vpop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind+currentpsi*(1-ind)
+      currentv      <- candidatv*ind+currentv*(1-ind)
+      
+      # variable cl 
+      
+      candidatcl    <- currentcl
+      candidatcl[k] <- candidatcl[k] + rnorm(1,0,sqrt(eta2cl))
+      psicandidat   <- cbind(exp(currentka),exp(currentv),exp(candidatcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep))^2)+1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep))^2)
+      logs          <- logs-1/2/omega2cl*((candidatcl[k]-log(clpop))^2-(currentcl[k]-log(clpop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind+currentpsi*(1-ind)
+      currentcl     <- candidatcl*ind+currentcl*(1-ind)
+      
+    }
+    psiMC[,,m] <- currentpsi
+  }
+  
+  ## Monte-Carlo evaluation of the FIM estimator based on the score
+  
+  # first order derivatives of the individual complete log-likelihood
+  tempderiveeMC[1,,] <- (log(psiMC[,1,])-log(kapop))/omega2ka/kapop
+  tempderiveeMC[2,,] <- (log(psiMC[,2,])-log(vpop))/omega2v/vpop
+  tempderiveeMC[3,,] <- (log(psiMC[,3,])-log(clpop))/omega2cl/clpop
+  tempderiveeMC[4,,] <- -1/2/omega2ka+1/2/omega2ka^2*(log(psiMC[,1,])-log(kapop))^2
+  tempderiveeMC[5,,] <- -1/2/omega2v+1/2/omega2v^2*(log(psiMC[,2,])-log(vpop))^2
+  tempderiveeMC[6,,] <- -1/2/omega2cl+1/2/omega2cl^2*(log(psiMC[,3,])-log(clpop))^2
+  for (m in 1:nbMC){
+    mco <- matrix((y-model1cpt(psiMC[,,m],id,xidep))^2,n,j,byrow=TRUE)
+    tempderiveeMC[7,,m]<- -j/2/sigma2+apply(mco,1,sum)/2/sigma2^2
+  }
+  
+  # computation of the FIM estimator based on the score (Isco)
+  for (m in 1:nbMC)
+  {
+    SnbMCindi <- apply(tempderiveeMC[,,1:m],c(1,2),mean)
+    temp <- 0
+    for (i in 1:n){
+      temp <- SnbMCindi[,i]%*%t(SnbMCindi[,i])+temp
+    }
+    iscoMC[,,m]<-temp/n
+  }
+  
+  ## Monte-Carlo evaluation of the observed FIM according to the Louis' formula
+  
+  # second order derivatives of the individual complete log-likelihood
+  for (m in 1:nbMC){
+    tempderiveeMC2[1,1,m] <- sum(-log(psiMC[,1,m])+log(kapop)-1)/omega2ka/kapop^2
+    tempderiveeMC2[2,2,m] <- sum(-log(psiMC[,2,m])+log(vpop)-1)/omega2v/vpop^2
+    tempderiveeMC2[3,3,m] <- sum(-log(psiMC[,3,m])+log(clpop)-1)/omega2cl/clpop^2
+    tempderiveeMC2[4,4,m] <- n/2/omega2ka^2 -1/omega2ka^3*sum((log(psiMC[,1,m])-log(kapop))^2)
+    tempderiveeMC2[5,5,m] <- n/2/omega2v^2 -1/omega2v^3*sum((log(psiMC[,2,m])-log(vpop))^2)
+    tempderiveeMC2[6,6,m] <- n/2/omega2cl^2 -1/omega2cl^3*sum((log(psiMC[,3,m])-log(clpop))^2)
+    tempderiveeMC2[7,7,m] <- n*j/2/sigma2^2-sum((y-model1cpt(psiMC[,,m],id,xidep))^2)/sigma2^3
+    tempderiveeMC2[1,4,m]<- -sum(log(psiMC[,1,m])-log(kapop))/omega2ka^2/kapop
+    tempderiveeMC2[2,5,m]<- -sum(log(psiMC[,2,m])-log(vpop))/omega2v^2/vpop
+    tempderiveeMC2[3,6,m]<- -sum(log(psiMC[,3,m])-log(clpop))/omega2cl^2/clpop
+    tempderiveeMC2[4,1,m]<- tempderiveeMC2[1,4,m]
+    tempderiveeMC2[5,2,m]<- tempderiveeMC2[2,5,m]
+    tempderiveeMC2[6,3,m]<- tempderiveeMC2[3,6,m]
+  }
+  
+  
+  
+  # computation of the observed FIM (Iobs)
+  
+  for (m in 1:nbMC){
+    temp2MC[,,m]<-apply(tempderiveeMC2[,,1:m],c(1,2),sum)/m/n
+  }
+  temp3 <- 0
+  for (m in 1:nbMC){
+    for (i in 1:n){
+      temp3 <-   tempderiveeMC[,i,m]%*%t(tempderiveeMC[,i,m])+temp3
+    }
+    temp3MC[,,m] <- temp3/m/n
+  }
+  TnbMC<- (temp2MC + temp3MC)
+  iobsMC <- iscoMC - TnbMC
+  
+  res <- list(iobsMC = iobsMC[,,nbMC], iscoMC =iscoMC[,,nbMC]) 
+  return(res)
+  
+}
+
+```
+
+
+```{r}
+#| label: simusNLMEexponential
+#| echo: false
+#| eval: false
+
+## Numerical study in the non linear mixed effects model belonging to the curved exponential family
+## This script performs only one run of the SAEM algorithm. The full experiment that is presented in the article consists of 500 runs of the SAEM algorithm which take together a long time. To perform the full experiment, use nbsim <- 500 rather than nbsim <- 1.
+
+## 1- Data simulation
+
+# Model function
+## returns the conditional mean of the observations given the random parameters psi and
+## structural covariates, in this case dose and time
+
+
+model1cptsim<-function(psi,id,tim,dose) {  
+  ka   <-psi[id,1]
+  V    <-psi[id,2]
+  CL   <-psi[id,3]
+  k    <-CL/V
+  ypred<-dose*ka/(V*(ka-k))*(exp(-k*tim)-exp(-ka*tim))
+  return(ypred)
+}
+
+# Sample characteristics  
+
+n     <- 100                             # number of subjects
+times <- c(0.25,0.5,1,2,3.5,5,7,9,12,24) # observation times
+j     <- length(times)                   # number of observations per subject
+dose  <- 320                             # dose
+
+# True parameter values
+
+vpop     <- 31
+kapop    <- 1.6
+clpop    <- 2.8
+omega2v  <- 0.40
+omega2ka <- 0.40
+omega2cl <- 0.40
+sigma2   <- 0.75
+
+# Simulation of the individual parameters
+
+vind  <- exp(rnorm(n,log(vpop),sd=sqrt(omega2v)))
+kaind <- exp(rnorm(n,log(kapop),sd=sqrt(omega2ka)))
+clind <- exp(rnorm(n,log(clpop),sd=sqrt(omega2cl)))
+
+# Simulation of the observations
+
+ypred <- c()
+
+for (k in 1:n){
+  ypred <- c(ypred,model1cptsim(cbind(kaind,vind,clind),k, times,dose))
+}
+
+y <- ypred + rnorm(n*j,0,sd=sqrt(sigma2))
+
+datasim <- data.frame(y=y,dose=rep(dose,n*j),time=rep(times,n),subject=kronecker(1:n, rep(1,j)))
+
+
+## 2- Numerical experiment on the same simulated dataset
+
+## a- Evaluation of both estimators of the FIM using the stochastic approximation algorithm
+
+nbsim <- 1 #number of replicates, nbsim <- 500 to perform the full experiment
+
+# Algorithmic settings
+nbiterem <- 3000
+nbiterburnin <- 1000
+
+# Saving the nbsim results
+iscoarray <- array(0,dim=c(nbsim,7,7,nbiterem))
+iobsarray <- array(0,dim=c(nbsim,7,7,nbiterem))
+thetaest <- matrix(NA,7,nbsim)
+
+for (k in 1:nbsim){
+  
+  set.seed(k*100+10)
+  
+  theta0         <- list(vpop=vpop*runif(1,0.8,1.2),kapop=kapop*runif(1,0.8,1.2),clpop=clpop*runif(1,0.8,1.2),omega2v=omega2v*runif(1,0.4,2),
+                         omega2ka=omega2ka*runif(1,0.4,2),omega2cl=omega2cl*runif(1,0.4,2),sigma2=sigma2*runif(1,0.4,2))
+  res            <- saem(datasim, nbiterem, nbiterburnin, theta0)
+  iscoarray[k,,,]<- res$isco 
+  iobsarray[k,,,]<- res$iobs 
+  thetaest[,k]   <- res$thetaest[,nbiterem]
+}
+
+## b- Monte-Carlo evaluation of both estimates, considered as the targets for the estimates computed using the stochastic approximation algorithm
+
+nbMC <- 10000
+nbMCburnin <- 5000
+
+tm <- rowMeans(thetaest)
+
+thetaMean <- list(kapop=tm[1],vpop=tm[2],clpop=tm[3],omega2ka=tm[4],omega2v=tm[5],omega2cl=tm[6],sigma2=tm[7])
+
+FisherMC <- FIM_mc(datasim, nbMC, nbMCburnin, thetaMean)
+
+iscoMC <- FisherMC$iscoMC
+iobsMC <- FisherMC$iobsMC
+```
+
+```{r}
+#| label: simusNLMEexponentialgraphs
+#| echo: false
+#| eval: false
+
+## Numerical study in the non linear mixed effects model belonging to the curved exponential family
+## This script generates the figures that are presented in the article from nbsim = 500 runs of the SAEM algorithm.
+
+biasIsco <- array(0,dim=c(7,7,nbsim,nbiterem))
+
+for (j in 1:nbsim){
+  for (k in 1:nbiterem){
+    biasIsco[,,j,k] <- (iscoarray[j,,,k] - iscoMC)/iscoMC
+  }
+}
+
+biasIobs <- array(0,dim=c(7,7,nbsim,nbiterem))
+
+for (j in 1:nbsim){
+  for (k in 1:nbiterem){
+    biasIobs[,,j,k] <- (iobsarray[j,,,k] - iobsMC)/iobsMC
+  }
+}
+
+
+DataResBias <- data.frame(
+  BiasF11=c(abs(colMeans(biasIsco[1,1,,])[(nbiterburnin+1):nbiterem]),abs(colMeans(biasIobs[1,1,,])[(nbiterburnin+1):nbiterem])),
+  BiasF22=c(abs(colMeans(biasIsco[2,2,,])[(nbiterburnin+1):nbiterem]),abs(colMeans(biasIobs[2,2,,])[(nbiterburnin+1):nbiterem])),
+  BiasF33=c(abs(colMeans(biasIsco[3,3,,])[(nbiterburnin+1):nbiterem]),abs(colMeans(biasIobs[3,3,,])[(nbiterburnin+1):nbiterem])),
+  BiasF44=c(abs(colMeans(biasIsco[4,4,,])[(nbiterburnin+1):nbiterem]),abs(colMeans(biasIobs[4,4,,])[(nbiterburnin+1):nbiterem])),
+  BiasF55=c(abs(colMeans(biasIsco[5,5,,])[(nbiterburnin+1):nbiterem]),abs(colMeans(biasIobs[5,5,,])[(nbiterburnin+1):nbiterem])),
+  BiasF66=c(abs(colMeans(biasIsco[6,6,,])[(nbiterburnin+1):nbiterem]),abs(colMeans(biasIobs[6,6,,])[(nbiterburnin+1):nbiterem])),
+  Iter=c(seq(1,nbiterem-nbiterburnin),seq(1,nbiterem-nbiterburnin)),
+  Estimate=c(rep('Isco',nbiterem-nbiterburnin),rep('Iobs',nbiterem-nbiterburnin)))
+
+BiasF11 <- ggplot(DataResBias, aes(y=BiasF11, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~ka~','~ ka~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+BiasF22 <- ggplot(DataResBias, aes(y=BiasF22, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~V~','~ V~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+BiasF33 <- ggplot(DataResBias, aes(y=BiasF33, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~Cl~','~ Cl~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+BiasF44 <- ggplot(DataResBias, aes(y=BiasF44, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~omega[ka]^2~','~ omega[ka]^2~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+BiasF55 <- ggplot(DataResBias, aes(y=BiasF55, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~omega[V]^2~','~ omega[V]^2~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+BiasF66 <- ggplot(DataResBias, aes(y=BiasF66, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~omega[Cl]^2~','~ omega[Cl]^2~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+
+plot_grid(BiasF11, BiasF22, BiasF33, BiasF44, BiasF55, BiasF66, ncol = 3, nrow = 2)
+
+#ii- Relative standard deviations over iterations
+
+rsdIsco <- array(0,dim=c(7,7,nbsim,nbiterem))
+
+for (j in 1:nbsim){
+  for (k in 1:nbiterem){
+    rsdIsco[,,j,k] <- (iscoarray[j,,,k] - iscoMC)^2/iscoMC^2
+  }
+}
+
+rsdIobs <- array(0,dim=c(7,7,nbsim,nbiterem))
+
+for (j in 1:nbsim){
+  for (k in 1:nbiterem){
+    rsdIobs[,,j,k] <- (iobsarray[j,,,k] - iobsMC)^2/iobsMC^2
+  }
+}
+
+DataResRsd <- data.frame(
+  RsdF11=c(colMeans(rsdIsco[1,1,,])[(nbiterburnin+1):nbiterem],colMeans(rsdIobs[1,1,,])[(nbiterburnin+1):nbiterem]),
+  RsdF22=c(colMeans(rsdIsco[2,2,,])[(nbiterburnin+1):nbiterem],colMeans(rsdIobs[2,2,,])[(nbiterburnin+1):nbiterem]),
+  RsdF33=c(colMeans(rsdIsco[3,3,,])[(nbiterburnin+1):nbiterem],colMeans(rsdIobs[3,3,,])[(nbiterburnin+1):nbiterem]),
+  RsdF44=c(colMeans(rsdIsco[4,4,,])[(nbiterburnin+1):nbiterem],colMeans(rsdIobs[4,4,,])[(nbiterburnin+1):nbiterem]),
+  RsdF55=c(colMeans(rsdIsco[5,5,,])[(nbiterburnin+1):nbiterem],colMeans(rsdIobs[5,5,,])[(nbiterburnin+1):nbiterem]),
+  RsdF66=c(colMeans(rsdIsco[6,6,,])[(nbiterburnin+1):nbiterem],colMeans(rsdIobs[6,6,,])[(nbiterburnin+1):nbiterem]),
+  Iter=c(seq(1,nbiterem-nbiterburnin),seq(1,nbiterem-nbiterburnin)),
+  Estimate=c(rep('Vn',nbiterem-nbiterburnin),rep('Wn',nbiterem-nbiterburnin)))
+
+RsdF11 <- ggplot(DataResRsd, aes(y=RsdF11, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~ka~','~ ka~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+RsdF22 <- ggplot(DataResRsd, aes(y=RsdF22, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~V~','~ V~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+RsdF33 <- ggplot(DataResRsd, aes(y=RsdF33, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~Cl~','~ Cl~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+RsdF44 <- ggplot(DataResRsd, aes(y=RsdF44, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~omega[ka]^2~','~ omega[ka]^2~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+RsdF55 <- ggplot(DataResRsd, aes(y=RsdF55, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~omega[V]^2~','~ omega[V]^2~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+RsdF66 <- ggplot(DataResRsd, aes(y=RsdF66, x=Iter, color=Estimate)) +
+  geom_line(size=1) +
+  scale_fill_manual(values = c("#984EA3",'#E69F00')) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote('('~omega[Cl]^2~','~ omega[Cl]^2~')')) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=90))
+
+plot_grid(RsdF11, RsdF22, RsdF33, RsdF44, RsdF55, RsdF66, ncol = 3, nrow = 2)
+```
+
+
+We observe that the bias and the standard deviations of the estimates of the components of both matrices decrease over iterations, and that for both estimates the bias is nearly zero when the convergence of the algorithm is reached.  According to these simulation results, there is no evidence that one method is better than the other in terms of bias or standard deviation.
+
+### In general latent variable model
+
+We use model specified by @eq-modelPK again, but we now consider that individual parameter $V_i$ is fixed, *i.e.* $V_i \equiv V$ $\forall i = 1,\ldots,n$. The model is no longer exponential in the sense of equation @eq-curvedexpo. We must therefore use the general version of the stochastic approximation algorithm from @sec-generalmodel to compute $I_{n,sco}(\hat{\theta})$.  We simulate 500 datasets according to this model and we estimate $I_{n,sco}(\hat{\theta})$ and $\hat{\theta}$ for each one. We perform $K=3000$ iterations of the algorithm by setting $\gamma_k=k^{-0.501}$. We compute the 500 asymptotic confidence intervals of the model parameters $[\hat{\theta}^{(\ell)}_k - q_{1-\alpha/2} \, \hat{\sigma}^{(\ell)}_k , \hat{\theta}^{(\ell)}_k + q_{1-\alpha/2} \, \hat{\sigma}^{(\ell)}_k]$, $\ell =1,\ldots,6$ and then deduce from them empirical coverage rates. The $\hat{\sigma}^{(\ell)}_k$'s are obtained through the diagonal terms of the inversed $V_n(\hat{\theta}_k)$'s, and $q_{1-\alpha/2}$  stands for the quantile of order $1-\alpha/2$ of a standard Gaussian distribution with zero mean. We obtain for the six parameters $(ka,V,Cl,\omega^2_{ka},\omega^2_{Cl},\sigma^2)$ empirical covering rates of 0.946,0.928,0.962,0.944,0.950,0.942 respectively for a nominal covering rate of 0.95. This highlights that our estimate accurately quantifies the precisions of parameter estimates. Convergence graphs obtained from a simulated data set are shown in @fig-convvn. Although theoretical guarantee is missing in non exponential models, the stochastic approximation algorithm proposed in @sec-generalmodel converges in practice on this example for both the estimation of the model parameters and the estimation of the Fisher information matrix. 
+
+::: {#fig-convvn}
+
+![](figures/convthetavnsanschauffe.png)
+
+Convergence plot for some parameter estimates and for some diagonal components of $I_{n,sco}(\hat{\theta})$ over iterations of the stochastic approximation algorithm.
+:::
+
+```{r}
+#| label: simusNLMEnonexponential
+#| echo: false
+#| eval: false
+
+
+## Numerical study in the non linear mixed effects model not belonging to the curved exponential family
+## This script performs one run of the SAEM algorithm on one simulated dataset and generates a convergence graph. The convergence graph that is presented in the article is obtained by running the SAEM algorithm on a simulated dataset composed of n=100 subjects which takes time. Here we rather propose simulating n=10 subjects and reducing the number of iterations of the SAEM algorithm. To perform the original experiment, use n <- 100 rather than n <- 10, nbiterem <- 3000 rather than nbiterem <- 500, nbiterburnin <- 1000 rather than nbiterburnin <- 250.
+
+
+
+## 1-Estimation functions
+
+# SAEM algorithm
+
+saem <- function(data, nbiterem, nbiterburnin, theta0, kRW=0.5) {
+  
+  # data         : dataset 
+  # nbiterem     : total number of iterations of the SAEM algorithm
+  # nbiterburnin : number of burn-in iterations of the algorithm
+  # theta0       : initial parameter values
+  # kRW          : coefficient used to adjust the variance of the proposal kernel of the MCMC procedure
+  
+  # Important functions used within each iteration of the SAEM algorithm
+  
+  ## conditional mean of the observations given the random parameters psi, fixed effect V,
+  ## and structural covariates, in this case dose and time
+  
+  model1cpt<-function(psi,id,xidep,V) {
+    dose  <- xidep[,1]
+    tim   <- xidep[,2]
+    ka    <- psi[id,1]
+    CL    <- psi[id,2]
+    k     <- CL/V
+    ypred <- dose*ka/(V*(ka-k))*(exp(-k*tim)-exp(-ka*tim))
+    return(ypred)
+  }
+  
+  # Derivative of the model function with respect to V
+  
+  dVmodel1cpt<-function(psi,id,xidep,V) {
+    dose  <- xidep[,1]
+    tim   <- xidep[,2]
+    ka    <- psi[id,1]
+    CL    <- psi[id,2]
+    ypred <- -dose*ka^2/(V*ka-CL)^2*(exp(-CL/V*tim)-exp(-ka*tim))+dose*ka/(V*ka-CL)*CL/V^2*tim*exp(-CL/V*tim)
+    return(ypred)
+  }
+  
+  # Q quantity 
+  
+  floglik <- function(v,y,psi,xidep,id,alpha){
+    l <- length(alpha)
+    psi <- array(psi,dim=c(n,2,l))
+    value <- 0
+    for (ll in 1:l){
+      moyij <- model1cpt(psi[,,ll],id,xidep,v)
+      value <- value + alpha[ll]*sum((y-moyij)^2) 
+    }
+    return(value)
+  }
+  
+  # data processing
+  xidep <- cbind(data$dose,data$time)
+  y     <- data$y
+  id    <- as.matrix(data$subject)
+  n     <- length(unique(id))
+  j     <- length(unique(data$time))
+  
+  # initial parameter values
+  
+  vpop     <- theta0$vpop
+  kapop    <- theta0$kapop
+  clpop    <- theta0$clpop
+  omega2ka <- theta0$omega2ka
+  omega2cl <- theta0$omega2cl
+  sigma2   <- theta0$sigma2
+  
+  p <- length(theta0) 
+  
+  thetaest     <- matrix(0,p,nbiterem)
+  thetaest[,1] <- c(kapop, vpop, clpop, omega2ka, omega2cl, sigma2)
+  
+  # variances of the proposal kernels of the MCMC procedure
+  eta2ka  <- kRW*omega2ka
+  eta2cl  <- kRW*omega2cl
+  
+  # sequence of step sizes 
+  gamma <-  1/(1:(nbiterem))^0.501
+  
+  cumgamma <- matrix(0,nbiterem,nbiterem) 
+  
+  diag(cumgamma) <- gamma
+  
+  for (l in 2:nbiterem){
+    for (m in 1:(l-1)){
+      cumgamma[l,m] <- (1-gamma[l])*cumgamma[l-1,m]  
+    }  
+  }
+  
+  # intermediary R objects
+  deltaindi     <- array(0,c(p,n,nbiterem))
+  tempderiveeas <- matrix(0,p,n)
+  dimstatexh    <- 5
+  statexh       <- matrix(0,dimstatexh,nbiterem)
+  mco           <- matrix(NA,c(n,j))
+  mco2          <- array(NA,dim=c(nbiterem,n,j))
+  mcos          <- rep(NA,n)
+  mcos2         <- matrix(NA,nbiterem,n)
+  STATEXH       <- rep(NA,dimstatexh)
+  psisauv       <- array(0,c(n,2,nbiterem))
+  
+  # initial values for the individual parameters
+  currentka  <- log(kapop) + rnorm(n,0,sqrt(eta2ka))
+  currentcl  <- log(clpop) + rnorm(n,0,sqrt(eta2cl))
+  currentpsi <- cbind(exp(currentka),exp(currentcl))
+  
+  
+  ## Start of the EM loop
+  for (l in 1:(nbiterem-1)){
+    
+    ## Simulation step 
+    for (k in 1:(n)){
+      
+      # Parameter ka
+      candidatka    <- currentka
+      candidatka[k] <- candidatka[k] + rnorm(1,0,sqrt(eta2ka))
+      psicandidat   <- cbind(exp(candidatka),exp(currentcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep,vpop))^2)+1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep,vpop))^2)
+      logs          <- logs-1/2/omega2ka*((candidatka[k]-log(kapop))^2-(currentka[k]-log(kapop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind + currentpsi*(1-ind)
+      currentka     <- candidatka*ind + currentka*(1-ind)
+      
+      # Parameter cl
+      candidatcl    <- currentcl
+      candidatcl[k] <- candidatcl[k] + rnorm(1,0,sqrt(eta2cl))
+      psicandidat   <- cbind(exp(currentka),exp(candidatcl))
+      logs          <- -1/2/sigma2*sum((y-model1cpt(psicandidat,id,xidep,vpop))^2)+1/2/sigma2*sum((y-model1cpt(currentpsi,id,xidep,vpop))^2)
+      logs          <- logs -1/2/omega2cl*((candidatcl[k]-log(clpop))^2-(currentcl[k]-log(clpop))^2)
+      u             <- runif(1)
+      logu          <- log(u)
+      ind           <- (logu<logs)
+      currentpsi    <- psicandidat*ind + currentpsi*(1-ind)
+      currentcl     <- candidatcl*ind + currentcl*(1-ind)
+      
+      # saving simulated data 
+      psisauv[,,l]  <- currentpsi
+    }
+    
+    psi <- psisauv[,,l]
+    
+    ## Parameter estimation update
+    
+    # estimation of the fixed effect by numerical optimization
+    resvpop <- optimize(interval=c(0.001,50),f=floglik,y=y,psi=psisauv[,,1:l],xidep=xidep,id=id,alpha=cumgamma[l,1:l])
+    vpop    <- resvpop$minimum
+    
+    # stochastic approximation of exhaustive statistics and estimation of the other parameters
+    
+    mco           <- matrix((y-model1cpt(psi,id,xidep,vpop))^2,n,j,byrow=TRUE)
+    mcos          <- apply(mco,1,sum)    
+    STATEXH       <- c(apply(log(psi),2,mean), apply(log(psi)^2,2,mean), sum(mcos))
+    statexh[,l+1] <- statexh[,l]*(1-gamma[l])+gamma[l]*STATEXH
+    
+    kapop           <- exp(statexh[1,l+1])
+    clpop           <- exp(statexh[2,l+1])
+    omega2ka        <- statexh[3,l+1]-statexh[1,l+1]^2
+    omega2cl        <- statexh[4,l+1]-statexh[2,l+1]^2
+    sigma2          <- statexh[5,l+1]/n/j
+    thetaest[,l+1]  <- c(kapop, vpop, clpop, omega2ka, omega2cl, sigma2)
+    
+    eta2cl <- kRW*omega2cl
+    eta2ka <- kRW*omega2ka
+    
+    
+    ## Stochastic approximation of the derivatives of the complete log-likelihood
+    
+    mco2[l,,]    <- matrix(dVmodel1cpt(psi,id,xidep,vpop)*(y-model1cpt(psi,id,xidep,vpop))/sigma2,n,j,byrow=TRUE)
+    mcos2[l,]    <- apply(mco2[l,,],1,sum)
+    
+    tempderiveeas[1,] <- (log(psi[,1])-log(kapop))/omega2ka/kapop
+    tempderiveeas[3,] <- (log(psi[,2])-log(clpop))/omega2cl/clpop
+    tempderiveeas[4,] <- -1/2/omega2ka +1/2/omega2ka^2*(log(psi[,1])-log(kapop))^2
+    tempderiveeas[5,] <- -1/2/omega2cl +1/2/omega2cl^2*(log(psi[,2])-log(clpop))^2
+    tempderiveeas[6,] <- -j/2/sigma2+apply(mco,1,sum)/2/sigma2^2
+    tempderiveeas[2,] <- mcos2[l,]
+    
+    deltaindi[,,l+1] <- deltaindi[,,l]*(1-gamma[l])+gamma[l]*tempderiveeas 
+  }
+  ## End of the em loop
+  
+  ## Computation of the FIM estimators based on the score
+  
+  isco <- array(0,c(p,p,nbiterem))
+  
+  for (l in 1:nbiterem){
+    isco[,,l] <- deltaindi[,,l]%*%t(deltaindi[,,l])/n
+  }
+  
+  
+  res <- list(isco = isco, thetaest = thetaest)
+  
+  
+  return(res)
+}
+
+##########################
+##########################
+
+## 2-Data simulation
+
+## Model function 
+## returns the conditional mean of the observations given the random parameters psi, time and dose
+
+model1cptsim<-function(psi,id,tim,dose) {
+  ka<-psi[id,1]
+  V<-psi[id,2]
+  CL<-psi[id,3]
+  k<-CL/V
+  ypred<-dose*ka/(V*(ka-k))*(exp(-k*tim)-exp(-ka*tim))
+  return(ypred)
+}
+
+## Sample characteristics 
+
+n     <- 10                              # number of subjects
+times <- c(0.25,0.5,1,2,3.5,5,7,9,12,24) # observation times
+j     <- length(times)                   # number of observations per subject
+dose  <- 320                             # dose
+
+## True parameter values
+vpop     <- 31
+kapop    <- 1.6
+clpop    <- 2.8
+omega2ka <- 0.40
+omega2cl <- 0.40 
+sigma2   <- 0.75
+
+## 2.1 Estimation and convergence graphs on one simulated dataset
+
+## Simulation of individual parameters
+vi  <- rep(vpop,n)
+kai <- exp(rnorm(n,log(kapop),sd=sqrt(omega2ka)))
+cli <- exp(rnorm(n,log(clpop),sd=sqrt(omega2cl)))
+
+## Simulation of the observations
+ypred <- c()
+for (k in 1:n){
+  ypred <- c(ypred,model1cptsim(cbind(kai,vi,cli),k,times,dose))
+}
+
+y <- ypred + rnorm(n*j,0,sd=sqrt(sigma2))
+
+datasim <- data.frame(y=y,dose=rep(dose,n*j),time=rep(times,n),subject=kronecker(1:n, rep(1,j)))
+
+## Estimation
+
+# Algorithmic settings
+nbiterem     <- 500
+nbiterburnin <- 250
+theta0       <- list(vpop=(vpop-5)*runif(1,0.8,1.2),kapop=kapop*runif(1,0.8,1.2),clpop=clpop*runif(1,0.8,1.2), omega2ka=omega2ka*runif(1,0.4,2),omega2cl=omega2cl*runif(1,0.4,2), sigma2=sigma2*runif(1,0.4,2))
+
+# Parameter and FIM estimation 
+res <- saem(datasim, nbiterem, nbiterburnin, theta0)
+
+# Convergence graphs
+
+DataResEst <- data.frame(
+  ka      = res$thetaest[1,],
+  V        = res$thetaest[2,],  
+  Cl       = res$thetaest[3,],
+  o2ka     = res$thetaest[4,],
+  Iscoka   = res$isco[1,1,],
+  Iscov    = res$isco[2,2,],
+  Iscocl   = res$isco[3,3,],
+  Iscoo2ka = res$isco[4,4,],
+  Iter=seq(1,nbiterem))
+
+kaconv <- ggplot(DataResEst, aes(y=ka, x=Iter)) +
+  geom_line(size=0.5) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote(ka)) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=45))
+
+vconv <- ggplot(DataResEst, aes(y=V, x=Iter)) +
+  geom_line(size=0.5) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote(V)) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=45))
+
+clconv <- ggplot(DataResEst, aes(y=Cl, x=Iter)) +
+  geom_line(size=0.5) +
+  xlab("") +
+  ylab("") +
+  ylim(2.5,3.2) +
+  ggtitle(bquote(Cl)) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=45))
+
+o2kaconv <- ggplot(DataResEst, aes(y=o2ka, x=Iter)) +
+  geom_line(size=0.5) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote(omega[ka]^2)) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=45))
+
+iscokaconv <- ggplot(DataResEst, aes(y=Iscoka, x=Iter)) +
+  geom_line(size=0.5) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote(I[n-sco](ka,ka))) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=45))
+
+iscovconv <- ggplot(DataResEst, aes(y=Iscov, x=Iter)) +
+  geom_line(size=0.5) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote(I[n-sco](V,V))) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=45))
+
+iscoclconv <- ggplot(DataResEst, aes(y=Iscocl, x=Iter)) +
+  geom_line(size=0.5) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote(I[n-sco](Cl,Cl))) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=45))
+
+iscoo2kaconv <- ggplot(DataResEst, aes(y=Iscoo2ka, x=Iter)) +
+  geom_line(size=0.5) +
+  xlab("") +
+  ylab("") +
+  ggtitle(bquote(I[n-sco](omega[ka]^2,omega[ka]^2))) +
+  theme(plot.title = element_text(size=20,face="bold"),legend.position='none',
+        axis.text.x = element_text(angle=45))
+
+plot_grid(kaconv, vconv, clconv, o2kaconv, iscokaconv, iscovconv, iscoclconv, iscoo2kaconv, ncol = 4, nrow = 2)
+
+```
+
+```{r}
+#| label: simusNLMEnonexponentialcovering
+#| echo: false
+#| eval: false
+
+
+## Numerical study in the non linear mixed effects model not belonging to the curved exponential family
+## This script performs one run of the SAEM algorithm on 500 simulated dataset and computes the empirical covering rates for the parameters by using the estimations of the FIM based on the score.
+## This part of the numerical study is not evaluated due to long computing times. 
+
+nbiterem     <- 3000 # total number of iterations
+nbiterburnin <- 1000 # number of burnin iterations
+
+nbsim <- 500  # number of simulated datasets  
+rate  <- 0.95 # nominal rate
+
+covering.isco <- rep(0,5)
+
+for (kk in 1:nbsim){
+  print(kk)
+  
+  ## Simulation of individual parameters
+  vi  <- rep(vpop,n)
+  kai <- exp(rnorm(n,log(kapop),sd=sqrt(omega2ka)))
+  cli <- exp(rnorm(n,log(clpop),sd=sqrt(omega2cl)))
+  
+  ## Simulation of the observations
+  ypred <- c()
+  for (k in 1:n){
+    ypred <- c(ypred,model1cptsim(cbind(kai,vi,cli),k,times,dose))
+  }
+  
+  y <- ypred + rnorm(n*j,0,sd=sqrt(sigma2))
+  
+  datasim <- data.frame(y=y,dose=rep(dose,n*j),time=rep(times,n),subject=kronecker(1:n, rep(1,j)))
+  
+  ## Estimation
+  
+  res <- saem(datasim, nbiterem, nbiterburnin, theta0)
+  
+  thetaest <- res$thetaest[,nbiterem]
+  isco <- res$isco[,,nbiterem]
+  
+  ## Confidence intervals 
+  
+  ICinfisco <- thetaest - qnorm(1-(1-rate)/2,0,1)*sqrt(diag(solve(isco))/n)
+  ICsupisco <- thetaest + qnorm(1-(1-rate)/2,0,1)*sqrt(diag(solve(isco))/n)
+  
+  covering.isco <- covering.isco+as.numeric((theta.true<=ICsupisco)&(theta.true>=ICinfisco))
+  
+}
+
+covering.isco/nbsim
+```
+
+
+### Comparison with other methods
+
+To the best of our knowledge, although there exists contributions focusing on the estimation of the Fisher information matrix in latent variable models, there is currently no method based on the first derivatives of the log-likelihood. We compare to [@Meng2017] who proposed an iterative method based on numerical first order derivatives of the Q function that is computed at each E-step of the EM algorithm. The model used by [@Meng2017] in their simulation study is a mixture of two Gaussian distributions with unknown expectations $\mu_1$ and $\mu_2$, fixed variances equal to $1$ and unknown proportion $\pi$. The model parameters are denoted by $\theta=(\mu_1,\mu_2,\pi)$.
+
+
+
+
+```{r}
+#| label: simusMeng
+#| echo: false
+#| eval: false
+
+## Numerical study in the Gaussian mixture model
+## This script computes the estimator of the FIM based on the score on a large number of simulated datasets of size n=750. Here choosing nrep <- 100 (ie 100 simulated datasets) is associated with a low computing time. To get into the conditions of the experiment described in the paper, change nrep <- 100 into nrep <- 10000 
+
+### EM algorithm
+
+EM <- function(y, nbiter = 100){
+  
+  # y      : vector of observations
+  # nbiter : number of em iterations
+  
+  # initialization using kmeans
+  km   <- kmeans(y,centers=2)
+  init <- list(Ppi = km$size[1]/sum(km$size), mu1 = km$centers[1], mu2 = km$centers[2])
+  
+  Ppi    <- rep(NA,(nbiter+1)) # estimations of the mixture proportion
+  Ppi[1] <- init$Ppi
+  mu1    <- rep(NA,(nbiter+1)) # mean estimations of the first mixture component
+  mu1[1] <- init$mu1
+  mu2    <- rep(NA,(nbiter+1)) # mean estimations of the second mixture component
+  mu2[1] <- init$mu2
+  
+  for (k in 1: nbiter){ 
+    
+    ## E-step
+    
+    omega     <- matrix(0,ncol=2,nrow=n)
+    omega[,1] <- dnorm(y,mean=mu1[k],sd=1)*(1-Ppi[k])/(dnorm(y,mean=mu1[k],sd=1)*(1-Ppi[k])+dnorm(y,mean=mu2[k],sd=1)*Ppi[k])
+    omega[,2] <- dnorm(y,mean=mu2[k],sd=1)*Ppi[k]/(dnorm(y,mean=mu1[k],sd=1)*(1-Ppi[k])+dnorm(y,mean=mu2[k],sd=1)*Ppi[k])
+    
+    ## M-step
+    mu1[k+1] <- sum(omega[,1]*y)/sum(omega[,1])
+    mu2[k+1] <- sum(omega[,2]*y)/sum(omega[,2])
+    Ppi[k+1] <- 1/n*sum(omega[,2])
+  }
+  
+  if (mu1[nbiter+1]<mu2[nbiter+1]){
+    m1 <- mu2[nbiter+1]
+    m2 <- mu1[nbiter+1]
+    prob <- 1-Ppi[nbiter+1]
+  } else{
+    m1 <- mu1[nbiter+1]
+    m2 <- mu2[nbiter+1]
+    prob <- Ppi[nbiter+1]
+  }
+  
+  res = list(m1=m1,m2=m2,prob=prob)
+  return(res)
+}
+
+### Computation of empirical covering rates and computation of the mean estimator based on the score based on a large number of simulated datasets
+
+
+rate <- 0.95 # nominal rate
+
+
+# True paramater values
+probtrue <- 2/3 # mixture proportion
+m1true   <- 3   # mean of the first mixture proportion
+m2true   <- 0   # mean of the second mixture proportion
+
+
+nrep <- 100 # number of simulated datasets
+
+# Intermediary R objects
+recouvprob <- 0
+recouvm1   <- 0
+recouvm2   <- 0
+isco <- list()
+
+## Start of the loop
+## nrep data simulation + parameter and FIM estimation
+for (j in 1:nrep){
+  
+  n <- 750
+  
+  z <- 1+rbinom(n,1,probtrue)
+  y <- c()
+  for (i in 1:n){
+    y <- c(y,rnorm(1,m1true*(z[i]==1)+m2true*(z[i]==2)))
+  }
+  
+  est <- EM(y)
+  
+  m1est   <- est$m1
+  m2est   <- est$m2
+  probest <- est$prob
+  
+  iscoest <- matrix(0,nrow=3,ncol=3)
+  
+  for (i in 1:n){
+    denomi <- (1-probest)*exp(-1/2*(y[i]-m1est)^2) + probest*exp(-1/2*(y[i]-m2est)^2)
+    espcondi <- as.matrix(1/denomi * c(exp(-1/2*(y[i]-m2est)^2)-exp(-1/2*(y[i]-m1est)^2),(y[i]-m1est)*(1-probest)*exp(-1/2*(y[i]-m1est)^2),(y[i]-m2est)*probest*exp(-1/2*(y[i]-m2est)^2)),nrow=3,ncol=1)
+    iscoest <- iscoest + espcondi%*%t(espcondi)
+  }
+  
+  ICinf <- c(probest,m1est,m2est) - qnorm(1-(1-rate)/2)*sqrt(diag(solve(iscoest)))
+  ICsup <- c(probest,m1est,m2est) + qnorm(1-(1-rate)/2)*sqrt(diag(solve(iscoest)))
+  
+  if ((probtrue>=ICinf[1])&(probtrue<=ICsup[1])){recouvprob <- recouvprob + 1}
+  if ((m1true>=ICinf[2])&(m1true<=ICsup[2])){recouvm1 <- recouvm1 + 1}
+  if ((m2true>=ICinf[3])&(m2true<=ICsup[3])){recouvm2 <- recouvm2 + 1}
+  
+  isco[[j]] <- iscoest
+}
+## End of the loop
+
+## Results
+
+### empirical covering rates
+recouvprob/nrep # mixture proportion
+recouvm1/nrep   # mean of the first mixture component
+recouvm2/nrep   # mean of the second mixture component
+
+### empirical mean of the nrep estimates of the FIM
+
+isco11 <- 0
+isco12 <- 0
+isco13 <- 0
+isco22 <- 0
+isco23 <- 0
+isco33 <- 0
+
+for (j in 1:nrep){
+  isco11 <- isco11 + isco[[j]][1,1]
+  isco12 <- isco12 + isco[[j]][1,2]
+  isco13 <- isco13 + isco[[j]][1,3]
+  isco22 <- isco22 + isco[[j]][2,2]
+  isco23 <- isco23 + isco[[j]][2,3]
+  isco33 <- isco33 + isco[[j]][3,3]
+}
+
+isco.mean <- matrix(c(isco11/nrep,isco12/nrep,isco13/nrep,isco12/nrep,isco22/nrep,isco23/nrep,isco13/nrep,isco23/nrep,isco33/nrep),ncol=3,nrow=3)
+isco.mean
+```
+
+We simulate 10000 datasets according to this Gaussian mixture model, using the same setting as [@Meng2017], *i.e.* $n=750$, $\pi=2/3$, $\mu_1=3$ and $\mu_2=0$. For each dataset $k=1,\ldots,10000$, we compute the parameter maximum likelihood estimate $\hat{\theta}_k = (\hat{\pi}_k,\widehat{\mu_1}_k,\widehat{\mu_2}_k)$ with an EM algorithm and then we derive $I_{n,sco}(\hat{\theta}_k)$ directly according to @eq-vnmis contrary to [@Meng2017] who used an iterative method. We compute the empirical mean of the  10000 estimated matrices leading to: 
 
 $$
-\begin{aligned}
-D_{x_N} & = \frac12
-\left[\begin{array}{cc}
-x_L^\top & x_N^\top \end{array}\right] \,
-\left[\begin{array}{cc}  L_L & B \\ B^\top & L_N \end{array}\right] \,
-\left[\begin{array}{c}
-x_L \\ x_N \end{array}\right] \\
-& = \frac12 (x_L^\top L_L x_L + 2 x_N^\top B^\top x_L + x_N^\top L_N x_N),
-\end{aligned}
-$$ {#eq-mylabel}
+\frac1{10000} \sum _k I_{n,sco}(\hat{\theta}_k)= \begin{pmatrix}
+2685.184 & -211.068 & -251.808\\
+-211.068 & 170.927 & -61.578 \\
+-251.808 & -61.578 & 392.859\\
+\end{pmatrix}.
+$$
 
-### Theorems and other amsthem-like environments
+Comparison with the results of [@Meng2017] is delicate since their numerical illustration of their method is based on a single simulated dataset thus potentially sensitive to sampling variations. However, they provide an estimation of the Fisher information matrix from this unique dataset   
+$$
+I_{Meng} = \begin{pmatrix}
+2591.3 & -237.9 & -231.8\\
+-237.9 & 155.8 & -86.7\\
+-231.8 & -86.7 & 394.5
+\end{pmatrix}.
+$$
 
-Quarto includes a nice support for theorems, with predefined prefix labels for theorems, lemmas, proposition, etc. see [this page](https://quarto.org/docs/authoring/cross-references.html#theorems-and-proofs). Here is a simple example:
+Our results are coherent with their ones. To check the reliability of our results, we then compute as above the 10000 asymptotic confidence intervals of the three model parameters. We obtain for the three parameters $(\pi,\mu_1,\mu_2)$ empirical covering rates of $0.953,0.949,0.951$ respectively for a nominal covering rate of $0.95$. Thus $I_{n,sco}$ accurately quantifies the precisions of parameter estimates.
 
-::: {#thm-slln}
-## Strong law of large numbers
-
-The sample average converges almost surely to the expected value:
-
-$$\overline{X}_n\ \xrightarrow{\text{a.s.}}\ \mu \qquad\textrm{when}\ n \to \infty.$$
-:::
-
-See @thm-slln.
-
-## Code
-
-Quarto uses either Jupyter or knitr to render code chunks. This can be triggered in the yaml header, e.g., for Jupyter (should be installed on your computer) use
-
-``` yaml
----
-title: "My Document"
-author "Jane Doe"
-jupyter: python3
----
-```
-
-For knitr (R + knitr must be installed on your computer)
-
-``` yaml
----
-title: "My Document"
-author "Jane Doe"
----
-```
-
-You can use Jupyter for Python code and more. And R + KnitR for if you want to mix R with Python (via the package reticulate @R-reticulate).
-
-### R
-
-`R` code [@R-base] chunks may be embedded as follows:
-
-```{r r-code, echo=TRUE}
-x <- rnorm(10)
-```
+# Conclusion and discussion
 
 
-### Python
+In this work, we address the estimation of the Fisher information matrix in general latent variable models. We focus on the empirical Fisher information matrix which is a moment estimate of the covariance matrix of the score.  We propose a stochastic approximation algorithm to compute this estimate when it can not be calculated analytically and establish its theoretical convergence properties. We carry out a simulation study in mixed effects model and in a Poisson mixture model to compare the performances of several estimates, namely the considered empirical Fisher information matrix and the observed  Fisher information matrix. We apply our methodology to real data which were fitted using a nonlinear mixed effects model.   We emphasize that the  empirical FIM requires less regularity assumptions than the  observed  FIM. From a computational point of view, the implementation of the algorithm for evaluating the empirical FIM only involves the first derivatives of the log-likelihood, in contrary to the one for evaluating the observed FIM which involves the second derivatives of the log-likelihood.
 
-``` yaml
----
-title: "My Document"
-author "Jane Doe"
-jupyter: python3
----
-```
-
-```{python, eval = FALSE}
-import matplotlib.pyplot as plt
-import numpy as np
-
-fig, ax = plt.subplots()
-ax.plot(np.arange(10))
-```
-
-## Figures
-
-Plots can be generated as follows:
-
-```{r pressure, message = FALSE}
-library("ggplot2")
-p <- ggplot(mpg, aes(displ, hwy)) +
-  geom_point() +
-  geom_smooth()
-p
-```
-
-Interactive plots may also be produced in the HTML output of the document:
-
-```{r, message=FALSE}
-library("plotly")
-ggplotly(p)
-```
-
-It is also possible to create figures from static images:
-
-:::{#fig-logo}
-
-![](figures/sfds.png)
-
-SFdS logo (c.a. 2021)
-
-:::
+The main perspective of this work is to adapt the procedure for statistical models whose derivatives of the log-likelihood have no tractable expressions, coupling the algorithm with numerical derivative procedures. 
 
 
-## Tables
+# Appendix
 
-Tables (with label: `@tbl-mylabel` renders @tbl-mylabel) can be generated with markdown as follows
+It is assumed that the random variables $s^0, z_1, z_2, \cdots$ are 
+defined on the same probability space $(\Omega, \mathcal{A}, P)$. We denote $\mathcal{F} = \{ \mathcal{F}_k \}_{k \geq 0}$ the increasing family of 
+$\sigma$-algebras generated by the random variables $s_0, z_1, z_2, \cdots, z_k$. We assume the following conditions:
 
-| Tables   |      Are      |  Cool |
-|----------|:-------------:|------:|
-| col 1 is |  left-aligned | $1600 |
-| col 2 is |    centered   |   $12 |
-| col 3 is | right-aligned |    $1 |
-: my table caption {#tbl-mylabel}
 
-Table can also be generated by some code, for instance with knitr here:
+- **(M1')** The parameter space $\Theta$ is an open subset of $\mathbb{R}^{p}$. The individual complete data likelihood function is given for all $i=1,\ldots,n$  by:
+$$
+f_i(z_i;\theta)
+= \exp\left(-\psi_i(\theta) + \left<S_i(z_i),\phi_i(\theta)\right>\right),
+$$
+where  $\left<\cdot,\cdot\right>$ denotes the scalar product, $S_i$ is a Borel
+function on $\mathbb{R}^{d_i}$  taking its values in an open subset $\mathcal{S}_i$ of $\mathbb{R}^{m_i}$. Moreover, the convex hull of $S(\mathbb{R}^{\sum d_i})$  is included in $\mathcal{S}$ and for all $\theta \in \Theta$ $\int S(z) \prod p_i(z_i;\theta) \mu(dz) < \infty$
 
-```{r cars}
-knitr::kable(summary(cars), caption = "Table caption.")
-```
+- **(M2')** Define for each $i$ $L_i : \mathcal{S}_i \times \Theta \to \mathbb{R}$ as $L_i(s_i; \theta)\triangleq - \psi_i(\theta) + \left<s_i,\phi_i(\theta)\right>$.The functions $\psi_i$ and $\phi_i$ are twice 
+continuously differentiable on $\Theta$. 
 
-## Algorithms
+- **(M3)** The function $\bar{s} : \Theta \rightarrow \mathcal{S}$ defined as
+$\bar{s}(\theta) \triangleq \int S(z) p(z; \theta) \mu(dz)$ is continuously differentiable on $\Theta$.
 
-A solution to typeset pseudocode just like you would do with $\LaTeX$, yet with HTML output is to rely on the JavaScript [peudocode.js](https://github.com/SaswatPadhi/pseudocode.js). Your pseudocode is written inside a `<pre>` tag. You need to modify the file `includes/pseudocode-footer.html` so that the `Id` of the rendered element match the one in `<pre id ="">`. The result is as follows:
+- **(M4)** The function $l:\Theta \rightarrow \mathbb{R}$ defined as 
+$l(\theta) \triangleq \log g(\theta) = \log \int_{\mathbb{R}^{d_z}} f(z;\theta) \mu(dz)$ is continuously differentiable on $\Theta$ and $\partial_\theta \int f(z; \theta) \mu(dz)= \int \partial_\theta f(z; \theta)  \mu(dz)$.
 
-::: {#algo-label}
+- **(M5)** There exists a continuously differentiable function
+$\widehat{\theta} : \ \mathcal{S} \rightarrow \Theta$, such that:
+$$ 
+\forall s \in \mathcal{S}, \ \  \forall \theta \in \Theta, \ \ 
+L(s; \widehat{\theta}(s))\geq L(s; \theta).
+$$ 
 
-<pre id="myalgo">
 
-\begin{algorithm}
-\caption{A simple Algorithm}
-\begin{algorithmic}
-\STATE \textbf{Data}: $\mathcal{X} = \{x_1, \dots, x_n\}$
-\STATE optimization parameters: number of iterations $T$, learning rate $\eta$
-\STATE \textbf{Result}: output $\mathcal{Y} = \{y_1, \dots, y_n\}$
-\PROCEDURE{myproc}{$T$, $\eta$}
-    \FOR{$t = 0$ \TO $T$}
-        \STATE do something (and fast please)
-    \ENDFOR
-\ENDPROCEDURE
-\end{algorithmic}
-\end{algorithm}
+In addition, we define:
 
-</pre>
+- **(SAEM1)** For all $k$ in $\mathbb{N}$, $\gamma_k \in [0,1]$, 
+$\sum_{k=1}^\infty \gamma_k = \infty$ and  $\sum_{k=1}^\infty \gamma_k^2 < \infty$.
 
-:::
+- **(SAEM2)**  $l:\Theta  \rightarrow  \mathbb{R}$ and  $\widehat{\theta} :  \mathcal{S} \rightarrow \Theta$ are $m$ times differentiable, where $m$ is the integer such that $\mathcal{S}$ is an open subset of $\mathbb{R}^m$. 
 
-## Handling references {#sec-references}
+- **(SAEM3)** For all positive Borel functions $\Phi$ $E[ \Phi( z_{k+1}) | \mathcal{F}_k ] = \int \Phi( z  ) p ( z; \theta_k) \mu( dz).$
 
-### Bibliographic references
+- **(SAEM4)** For all $\theta \in \Theta$, $\int \| S(z) \|^2 p( z; \theta) \mu (d z) < \infty$, and the function 
+$$
+\begin{split}
+\Gamma(\theta) \triangleq \mathrm{Cov}_\theta [S(z)]\triangleq &\int
+S(z)^t S(z) p(z;\theta)\mu(dz)\\
+&-\left[\int S(z)p(z;\theta)\mu(dz)\right]^t\left[\int S(z)p(z;\theta)\mu(dz)\right]
+\end{split}
+$$
+is continuous w.r.t. $\theta$.
 
-References are displayed as footnotes using
-[BibTeX](http://www.bibtex.org/), e.g. `[@computo]` will be displayed
-as [@computo], where `computo` is the bibtex key for this specific
-entry. The bibliographic information is automatically retrieved from
-the `.bib` file specified in the header of this document (here:
-`references.bib`).
 
-### Other cross-references
+We also define assumptions required for the normality result:
 
-As already (partially) seen, Quarto includes a mecanism similar to the
-bibliographic references for sections, equations, theorems, figures,
-lists, etc. Have a look at [this
-page](https://quarto.org/docs/authoring/cross-references.html).
+- **(SAEM1')** For all $k$ in $\mathbb{N}$, $\gamma_k \in [0,1]$, 
+$\sum_{k=1}^\infty \gamma_k = \infty$ and  $\sum_{k=1}^\infty \gamma_k^2 < \infty$. There exists $\gamma^*$ such that $\lim k^\alpha /\gamma_k =\gamma^*$, and $\gamma_k / \gamma_{k+1}=1 + O(k^{-1})$.
 
-::: {.callout-warning}
+- **(SAEM4')** For some $\alpha>0$, $\sup_\theta \mathrm{E}_\theta(\|S(Z)\|^{2+\alpha})< \infty$ and $\Gamma$ is continuous w.r.t. $\theta$.
 
-## For more information
+- **(LOC1)** The stationary points of $l$ are isolated: any compact subset of $\Theta$ contains only a finite number of such points.
 
-[Check our mock version of the t-SNE paper](https://computo.sfds.asso.fr/published-paper-tsne/) for a full and advanced example.
+- **(LOC2)** For every stationary point $\theta^*$, the matrices $\mathrm{E}_\theta^*(\partial_\theta L(S(Z),\theta^*) (\partial_\theta L(S(Z),\theta^*))^t)$  and $\partial_\theta^2  L(\mathrm{E}_\theta^* (S(Z)),\theta^*)$ are positive definite.
 
-:::
-
-# Session information {.appendix .unnumbered}
-
-```{r session-info}
-sessionInfo()
-```
+- **(LOC3)** The minimum eigenvalue of the covariance matrix $R(\theta)=\mathrm{E}_\theta((S(Z)-\bar{s}(\theta))(S(Z)-\bar{s}(\theta))^t)$
+is bounded away from zero for $\theta$ in any compact subset of $\Theta$.
 
